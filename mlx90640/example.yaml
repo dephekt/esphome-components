@@ -1,0 +1,114 @@
+# Example usage of the MLX90640 thermal camera component
+# This example shows the NEW auto-generated controls approach
+# No manual template sensors or controls needed!
+
+esphome:
+  name: thermal-monitor
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Required I2C configuration for MLX90640
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+
+# External components - users can reference this component
+external_components:
+  - source:
+      type: git
+      url: https://github.com/terpasaurus-midwest/esphome-fork
+      ref: m5cores3  # must use this branch even if you don't have an S3
+      path: my_components
+    components: [mlx90640]
+
+# MLX90640 thermal camera, all options are under this
+mlx90640:
+  id: thermal_camera
+
+  # Hardware settings
+  refresh_rate: "16Hz"        # 0.5Hz to 64Hz
+  resolution: "18-bit"        # 16-bit to 19-bit
+  pattern: "chess"            # chess (recommended) or interleaved
+  single_frame: false         # true for motion artifact reduction
+  update_interval: 10000      # Update every 10 seconds
+
+  # Auto-generated temperature sensors (optional)
+  temperature_sensors:
+    min:
+      name: "Thermal Min Temperature"
+      accuracy_decimals: 1
+    max:
+      name: "Thermal Max Temperature"
+      accuracy_decimals: 1
+    avg:
+      name: "Thermal Average Temperature"
+      accuracy_decimals: 1
+    roi_min:
+      name: "ROI Min Temperature"
+      accuracy_decimals: 1
+    roi_max:
+      name: "ROI Max Temperature"
+      accuracy_decimals: 1
+    roi_avg:
+      name: "ROI Average Temperature"
+      accuracy_decimals: 1
+
+  # Auto-generated user controls (optional - all settings persist across reboots!)
+  update_interval_control:
+    name: "Thermal Update Interval"
+    min_value: 100              # 100ms minimum
+    max_value: 30000            # 30 second maximum
+    step: 100                   # 100ms increments
+    restore_value: true
+
+  thermal_palette_control:
+    name: "Thermal Color Palette"
+    restore_value: true
+
+  roi_enabled_control:
+    name: "ROI Enabled"
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  roi_center_row_control:
+    name: "ROI Center Row"
+    min_value: 1
+    max_value: 24
+    step: 1
+    restore_value: true
+
+  roi_center_col_control:
+    name: "ROI Center Column"
+    min_value: 1
+    max_value: 32
+    step: 1
+    restore_value: true
+
+  roi_size_control:
+    name: "ROI Size"
+    min_value: 1
+    max_value: 10
+    step: 1
+    restore_value: true
+
+  # This is a switch to enable/disable the web overlay feature
+  web_overlay_enabled_control:
+    name: "Enable Image Overlay"
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # ROI static configuration (used as initial/fallback values)
+  roi:
+    enabled: false              # Start with ROI disabled
+    center_row: 12              # Center of 24-row thermal array
+    center_col: 16              # Center of 32-column thermal array
+    size: 3                     # Creates 7x7 ROI (2*3+1)
+
+  # Web server JPEG endpoint for thermal image viewing
+  web_server:
+    enable: true                # Disable this for performance if you don't need it
+    path: "/thermal.jpg"        # Access at http://device-ip/thermal.jpg
+    quality: 85                 # JPEG quality (10-100)
+    overlay_enabled: true       # Enable ROI and temperature overlays on JPEG
