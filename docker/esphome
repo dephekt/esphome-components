@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# ESPHome CLI in the local-context dev container, against this repo.
+#
+# WHY THIS WRAPPER: the AtomS3U is USB-attached to THIS machine, but the
+# user's default docker context is remote (media-server -> ssh://containers),
+# where the device does not exist. We force the LOCAL daemon via
+# DOCKER_CONTEXT=default so /dev/ttyACM0 is reachable. Run from anywhere.
+#
+#   ./docker/esphome compile configs/test-atoms3u-sensors.yaml
+#   ./docker/esphome run     configs/test-atoms3u-sensors.yaml --device /dev/ttyACM0
+#   ./docker/esphome logs    configs/test-atoms3u-sensors.yaml --device /dev/ttyACM0
+#
+# Config paths are relative to the repo root (mounted at /config in the
+# container). esptool/other tools: ./docker/esphome ... or override the
+# entrypoint with raw `docker compose` if needed.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec env DOCKER_CONTEXT=default docker compose -f "$here/esphome-dev.yml" run --rm esphome "$@"

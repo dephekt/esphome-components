@@ -1,0 +1,6 @@
+# ESPHome build / PlatformIO cache (created by the docker dev loop at repo root
+# because the repo is mounted at /config). Do not commit.
+.esphome/
+
+# Per-device Wi-Fi / API secrets referenced via !secret in dev configs.
+secrets.yaml
