@@ -736,6 +736,22 @@ bool MLX90640Component::get_roi_crosshair_coords(int image_x, int image_y, int i
 
 #ifdef USE_NETWORK
 // Web server JPEG generation implementation
+// Handler for the thermal-image HTTP endpoint. ESPHome's web_server_idf
+// backend dispatches requests to registered AsyncWebHandlers; there is no
+// AsyncWebServer::on() on this backend (used on 2026.x, incl. Arduino).
+class MLX90640ThermalImageHandler : public AsyncWebHandler {
+ public:
+  MLX90640ThermalImageHandler(MLX90640Component *parent, const std::string &path) : parent_(parent), path_(path) {}
+  bool canHandle(AsyncWebServerRequest *request) const override {
+    return request->method() == HTTP_GET && request->url() == this->path_;
+  }
+  void handleRequest(AsyncWebServerRequest *request) override { this->parent_->handle_thermal_image_request_(request); }
+
+ protected:
+  MLX90640Component *parent_;
+  std::string path_;
+};
+
 void MLX90640Component::setup_web_server_() {
   ESP_LOGCONFIG(TAG, "Setting up web server endpoint at %s", web_server_path_.c_str());
 
@@ -748,16 +764,9 @@ void MLX90640Component::setup_web_server_() {
   // Ensure the web server base is initialized
   base_->init();
 
-  // Check if AsyncWebServer instance is ready
-  auto server = base_->get_server();
-  if (!server) {
-    ESP_LOGW(TAG, "AsyncWebServer not ready, thermal image endpoint not registered");
-    return;
-  }
-
-  // Now safe to register our handler
-  server->on(web_server_path_.c_str(), HTTP_GET,
-             [this](AsyncWebServerRequest *request) { this->handle_thermal_image_request_(request); });
+  // Register our endpoint as an AsyncWebHandler (web_server_idf has no
+  // AsyncWebServer::on()). The handler lives for the program's lifetime.
+  base_->add_handler(new MLX90640ThermalImageHandler(this, web_server_path_));
 
   ESP_LOGCONFIG(TAG, "Thermal image endpoint registered successfully");
 }
@@ -849,8 +858,10 @@ void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, in
   ESP_LOGD(TAG, "JPEG created in memory: %d bytes", jpeg_size);
 
   if (jpeg_size > 0) {
-    // Serve JPEG directly from memory
-    AsyncWebServerResponse *response = request->beginResponse_P(200, "image/jpeg", jpg_buffer, jpeg_size);
+    // Serve JPEG from memory. Copy into a std::string response (web_server_idf
+    // dropped beginResponse_P); the copy lets us free jpg_buffer below safely.
+    std::string jpg_content(reinterpret_cast<const char *>(jpg_buffer), jpeg_size);
+    AsyncWebServerResponse *response = request->beginResponse(200, "image/jpeg", jpg_content);
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
