@@ -99,7 +99,7 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         # Threshold number entities
         cv.Optional(CONF_CO2_HIGH_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="ppm"
         ).extend(
             {
                 cv.Optional("min_value", default=500): cv.float_,
@@ -110,7 +110,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_CO2_LOW_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="ppm"
         ).extend(
             {
                 cv.Optional("min_value", default=400): cv.float_,
@@ -121,7 +121,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_TEMP_HIGH_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="°C"
         ).extend(
             {
                 cv.Optional("min_value", default=15): cv.float_,
@@ -132,7 +132,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_TEMP_LOW_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="°C"
         ).extend(
             {
                 cv.Optional("min_value", default=10): cv.float_,
@@ -143,7 +143,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_HUMIDITY_HIGH_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="%"
         ).extend(
             {
                 cv.Optional("min_value", default=30): cv.float_,
@@ -154,7 +154,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_HUMIDITY_LOW_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="%"
         ).extend(
             {
                 cv.Optional("min_value", default=10): cv.float_,
@@ -165,7 +165,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_VPD_HIGH_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="kPa"
         ).extend(
             {
                 cv.Optional("min_value", default=0.5): cv.float_,
@@ -176,7 +176,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_VPD_LOW_THRESHOLD_NUMBER): number.number_schema(
-            TemplateNumber
+            TemplateNumber, unit_of_measurement="kPa"
         ).extend(
             {
                 cv.Optional("min_value", default=0.1): cv.float_,
@@ -267,7 +267,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_CO2_HIGH_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("ppm"))
 
     if CONF_CO2_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_CO2_LOW_THRESHOLD_NUMBER]
@@ -283,7 +282,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_CO2_LOW_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("ppm"))
 
     if CONF_TEMP_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_TEMP_HIGH_THRESHOLD_NUMBER]
@@ -299,7 +297,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_TEMP_HIGH_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("°C"))
 
     if CONF_TEMP_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_TEMP_LOW_THRESHOLD_NUMBER]
@@ -315,7 +312,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_TEMP_LOW_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("°C"))
 
     if CONF_HUMIDITY_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_HUMIDITY_HIGH_THRESHOLD_NUMBER]
@@ -331,7 +327,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_HUMIDITY_HIGH_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("%"))
 
     if CONF_HUMIDITY_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_HUMIDITY_LOW_THRESHOLD_NUMBER]
@@ -347,7 +342,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_HUMIDITY_LOW_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("%"))
 
     if CONF_VPD_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_VPD_HIGH_THRESHOLD_NUMBER]
@@ -363,7 +357,6 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_VPD_HIGH_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("kPa"))
 
     if CONF_VPD_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_VPD_LOW_THRESHOLD_NUMBER]
@@ -379,4 +372,3 @@ async def to_code(config):
         cg.add(num.set_initial_value(config[CONF_VPD_LOW_THRESHOLD]))
         cg.add(num.set_optimistic(num_config["optimistic"]))
         cg.add(num.set_restore_value(num_config["restore_value"]))
-        cg.add(num.traits.set_unit_of_measurement("kPa"))
