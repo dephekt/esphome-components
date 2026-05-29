@@ -12,7 +12,6 @@
 #endif
 #include "MLX90640_API.h"
 #include "MLX90640_I2C_Driver.h"
-#include <Wire.h>
 #include <algorithm>
 #ifdef USE_NETWORK
 // Always include JPEGENC for JPEG generation

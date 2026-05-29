@@ -58,6 +58,10 @@ void MLX90640Component::dump_config() {
 void MLX90640Component::setup_thermal_() {
   ESP_LOGCONFIG(TAG, "Initializing MLX90640 thermal camera...");
 
+  // Route the Melexis driver's I2C through this component's ESPHome bus
+  // (no Arduino Wire). Must happen before the first MLX90640_* call.
+  MLX90640_SetI2CBus(this->bus_);
+
   // Dump EEPROM parameters
   uint16_t eeMLX90640[832];
   int status = MLX90640_DumpEE(this->address_, eeMLX90640);

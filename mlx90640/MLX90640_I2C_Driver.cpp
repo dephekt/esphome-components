@@ -14,95 +14,92 @@
    limitations under the License.
 
 */
-#include <Arduino.h>
-#include <Wire.h>
-
+// I2C transport for the Melexis driver, routed through ESPHome's i2c bus.
+//
+// Previously this used Arduino <Wire.h> directly and relied on ESPHome's old
+// Arduino-Wire i2c backend having initialised the bus. ESPHome (2026.x) drives
+// I2C through the IDF driver, so the global Wire object is never set up and
+// every read NACKs. The MLX90640 component registers as an i2c::I2CDevice; it
+// hands us its I2CBus via MLX90640_SetI2CBus() and we use it here. No Wire.
 #include "MLX90640_I2C_Driver.h"
+#include "esphome/components/i2c/i2c.h"
 
-void MLX90640_I2CInit() {}
+namespace {
+esphome::i2c::I2CBus *mlx90640_i2c_bus = nullptr;
+}  // namespace
 
-// Read a number of words from startAddress. Store into Data array.
-// Returns 0 if successful, -1 if error
+void MLX90640_SetI2CBus(esphome::i2c::I2CBus *bus) { mlx90640_i2c_bus = bus; }
+
+void MLX90640_I2CInit(void) {}
+
+// Read nMemAddressRead 16-bit words starting at startAddress. Returns 0 on
+// success, -1 on error.
 int MLX90640_I2CRead(uint8_t slaveAddr, uint16_t startAddress, uint16_t nMemAddressRead, uint16_t *data) {
-  // Caller passes number of 'unsigned ints to read', increase this to 'bytes
-  // to read'
-  uint16_t bytesRemaining = nMemAddressRead * 2;
+  if (mlx90640_i2c_bus == nullptr)
+    return -1;
 
-  // It doesn't look like sequential read works. Do we need to re-issue the
-  // address command each time?
+  // Read in small chunks, re-issuing the address each time (matches the proven
+  // original driver). A single large combined transaction — e.g. the 832-word
+  // EEPROM dump or 834-word frame — stalls the IDF i2c driver long enough to
+  // trip the task watchdog. Each chunk is its own short write(no-stop)+read.
+  static const uint16_t MAX_WORDS_PER_READ = 16;  // 32 bytes per i2c transaction
+  uint16_t words_done = 0;
+  while (words_done < nMemAddressRead) {
+    uint16_t chunk = nMemAddressRead - words_done;
+    if (chunk > MAX_WORDS_PER_READ)
+      chunk = MAX_WORDS_PER_READ;
 
-  uint16_t dataSpot = 0;  // Start at beginning of array
+    const uint16_t addr = startAddress + words_done;
+    const uint8_t addr_buf[2] = {(uint8_t) (addr >> 8), (uint8_t) (addr & 0xFF)};
 
-  // Setup a series of chunked I2C_BUFFER_LENGTH byte reads
-  while (bytesRemaining > 0) {
-    Wire.beginTransmission(slaveAddr);
-    Wire.write(startAddress >> 8);         // MSB
-    Wire.write(startAddress & 0xFF);       // LSB
-    if (Wire.endTransmission(false) != 0)  // Do not release bus
-    {
-      Serial.println("No ack read");
-      return (0);  // Sensor did not ACK
+    // Atomic write-address-then-read with a repeated start. NOTE: ESPHome's
+    // legacy write(stop=false)+read() does NOT work here — those wrappers
+    // ignore `stop` and each issues its own STOP, so the MLX loses its address
+    // pointer between the two and returns garbage. write_readv() is the one
+    // primitive that keeps the connection open across the restart.
+    uint8_t raw[MAX_WORDS_PER_READ * 2];
+    if (mlx90640_i2c_bus->write_readv(slaveAddr, addr_buf, 2, raw, (size_t) chunk * 2) != esphome::i2c::ERROR_OK)
+      return -1;
+
+    // Bytes arrive MSB,LSB per word; assemble into host-order uint16.
+    for (uint16_t i = 0; i < chunk; i++) {
+      data[words_done + i] = ((uint16_t) raw[2 * i] << 8) | raw[2 * i + 1];
     }
-
-    uint16_t numberOfBytesToRead = bytesRemaining;
-    if (numberOfBytesToRead > I2C_BUFFER_LENGTH)
-      numberOfBytesToRead = I2C_BUFFER_LENGTH;
-
-    Wire.requestFrom((uint8_t) slaveAddr, numberOfBytesToRead);
-    if (Wire.available()) {
-      for (uint16_t x = 0; x < numberOfBytesToRead / 2; x++) {
-        // Store data into array
-        data[dataSpot] = Wire.read() << 8;  // MSB
-        data[dataSpot] |= Wire.read();      // LSB
-
-        dataSpot++;
-      }
-    }
-
-    bytesRemaining -= numberOfBytesToRead;
-
-    startAddress += numberOfBytesToRead / 2;
+    words_done += chunk;
   }
-
-  return (0);  // Success
+  return 0;
 }
 
-// Set I2C Freq, in kHz
-// MLX90640_I2CFreqSet(1000) sets frequency to 1MHz
-void MLX90640_I2CFreqSet(int freq) {
-  // i2c.frequency(1000 * freq);
-  Wire.setClock((long) 1000 * freq);
-}
+// I2C clock is configured on the ESPHome i2c bus (YAML `frequency:`); the
+// Melexis API still calls this, so keep it as a no-op.
+void MLX90640_I2CFreqSet(int freq) { (void) freq; }
 
-// Write two bytes to a two byte address
+// Write one 16-bit word to a 16-bit address, then read it back to verify.
 int MLX90640_I2CWrite(uint8_t slaveAddr, uint16_t writeAddress, uint16_t data) {
-  Wire.beginTransmission((uint8_t) slaveAddr);
-  Wire.write(writeAddress >> 8);    // MSB
-  Wire.write(writeAddress & 0xFF);  // LSB
-  Wire.write(data >> 8);            // MSB
-  Wire.write(data & 0xFF);          // LSB
-  if (Wire.endTransmission() != 0) {
-    // Sensor did not ACK
-    Serial.println("Error: Sensor did not ack");
-    return (-1);
-  }
+  if (mlx90640_i2c_bus == nullptr)
+    return -1;
 
-  uint16_t dataCheck;
-  MLX90640_I2CRead(slaveAddr, writeAddress, 1, &dataCheck);
-  if (dataCheck != data) {
-    // Serial.println("The write request didn't stick");
+  const uint8_t buf[4] = {(uint8_t) (writeAddress >> 8), (uint8_t) (writeAddress & 0xFF), (uint8_t) (data >> 8),
+                          (uint8_t) (data & 0xFF)};
+  if (mlx90640_i2c_bus->write(slaveAddr, buf, 4, true) != esphome::i2c::ERROR_OK)
+    return -1;
+
+  uint16_t dataCheck = 0;
+  if (MLX90640_I2CRead(slaveAddr, writeAddress, 1, &dataCheck) != 0)
+    return -1;
+  if (dataCheck != data)
     return -2;
-  }
 
-  return (0);  // Success
+  return 0;
 }
 
-// General I2C reset - sends 0x06 to address 0x00 to reset all devices on bus
+// General I2C reset - sends 0x06 to the general-call address (0x00).
 int MLX90640_I2CGeneralReset(void) {
-  Wire.beginTransmission(0x00);  // General call address
-  Wire.write(0x06);              // Reset command
-  if (Wire.endTransmission() != 0) {
-    return -1;  // NACK occurred
-  }
-  return 0;  // Success
+  if (mlx90640_i2c_bus == nullptr)
+    return -1;
+
+  const uint8_t reset_cmd = 0x06;
+  if (mlx90640_i2c_bus->write(0x00, &reset_cmd, 1, true) != esphome::i2c::ERROR_OK)
+    return -1;
+  return 0;
 }

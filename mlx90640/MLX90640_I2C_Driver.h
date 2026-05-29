@@ -20,6 +20,16 @@
 #include <stdint.h>
 #include "MLX90640_API.h"
 
+// The MLX90640 component (an i2c::I2CDevice) hands the Melexis driver its
+// ESPHome I2C bus via this setter; all transfers below go through it instead
+// of Arduino Wire. Must be called before any other MLX90640_I2C* call.
+namespace esphome {
+namespace i2c {
+class I2CBus;
+}  // namespace i2c
+}  // namespace esphome
+extern void MLX90640_SetI2CBus(esphome::i2c::I2CBus *bus);
+
 extern void MLX90640_I2CInit(void);
 extern int MLX90640_I2CGeneralReset(void);
 extern int MLX90640_I2CRead(uint8_t slaveAddr, uint16_t startAddress, uint16_t nMemAddressRead, uint16_t *data);
