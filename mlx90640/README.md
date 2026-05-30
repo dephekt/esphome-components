@@ -88,6 +88,24 @@ mlx90640:
     size: 3                    # Creates 7x7 area (2*size+1)
 ```
 
+### Thermography Parameters
+
+Control the heat calculation accuracy:
+
+```yaml
+mlx90640:
+  # Static config — applied at boot, overridden by runtime controls when wired
+  emissivity: 0.95            # Surface IR emissivity 0.1–1.0 (default: 0.95)
+                              # Use 0.95 for most surfaces; metals can be much lower
+  # reflected_temperature: 22.0  # Foil-measured reflected temperature in °C
+                              # Omit (or comment out) to use automatic mode
+  ta_shift: 8.0               # Auto mode: reflected temp = ambient − ta_shift (default: 8.0)
+```
+
+- **emissivity**: A property of the measured surface. Most non-metal surfaces are close to 0.95. Bare metal can be 0.05–0.3. Getting this wrong shifts all temperature readings.
+- **reflected_temperature**: The apparent temperature reflected into the sensor from the scene background, measured with a piece of crumpled aluminium foil placed at the scene. If omitted, the component computes it automatically as `Ta − ta_shift` (ambient minus 8°C by default, FLIR convention).
+- **ta_shift**: Only used when `reflected_temperature` is omitted (auto mode). Increase for hotter environments; decrease for cooler ones.
+
 ### Runtime Controls
 
 Auto-generated controls for runtime adjustment:
@@ -108,6 +126,14 @@ mlx90640:
     name: "ROI Size"
   web_overlay_enabled_control:
     name: "Web Overlay"
+
+  # Thermography runtime controls (NVS-persisted, take effect next frame)
+  emissivity_control:
+    name: "Emissivity"             # 0.1–1.0, step 0.01
+  reflected_temperature_control:
+    name: "Reflected Temperature"  # −40–300°C, step 0.5; only used when auto is OFF
+  reflected_temperature_auto_control:
+    name: "Reflected Temperature Auto"  # ON → auto (Ta−ta_shift); OFF → use number above
 ```
 
 All controls persist settings across reboots.

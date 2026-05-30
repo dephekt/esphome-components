@@ -1,6 +1,7 @@
 #include "mlx90640.h"
 #include "esphome/core/log.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace esphome {
@@ -144,8 +145,13 @@ void MLX90640Component::update_thermal_data_() {
     // Calculate temperatures using this frame
     float vdd = MLX90640_GetVdd(mlx90640Frame_, &mlx90640_params_);
     float Ta = MLX90640_GetTa(mlx90640Frame_, &mlx90640_params_);
-    float tr = Ta - TA_SHIFT;
-    float emissivity = 0.95;
+    float tr;
+    if (reflected_temperature_auto_ || std::isnan(reflected_temperature_)) {
+      tr = Ta - ta_shift_;
+    } else {
+      tr = reflected_temperature_;
+    }
+    float emissivity = emissivity_;
 
     // Calculate pixel temperatures
     MLX90640_CalculateTo(mlx90640Frame_, &mlx90640_params_, emissivity, tr, mlx90640_pixels_);
@@ -1338,11 +1344,20 @@ void MLX90640Switch::setup() {
   optional<bool> initial_state = this->get_initial_state_with_restore_mode();
 
   if (initial_state.has_value()) {
-    const char *control_name = (control_type_ == WEB_OVERLAY_ENABLED) ? "Web overlay enabled" : "ROI enabled";
+    const char *control_name;
+    if (control_type_ == WEB_OVERLAY_ENABLED) {
+      control_name = "Web overlay enabled";
+    } else if (control_type_ == REFLECTED_TEMPERATURE_AUTO) {
+      control_name = "Reflected temperature auto";
+    } else {
+      control_name = "ROI enabled";
+    }
     ESP_LOGD("MLX90640Switch", "Restored %s state: %s", control_name, initial_state.value() ? "ON" : "OFF");
     if (parent_ != nullptr) {
       if (control_type_ == WEB_OVERLAY_ENABLED) {
         parent_->update_web_overlay_enabled(initial_state.value());
+      } else if (control_type_ == REFLECTED_TEMPERATURE_AUTO) {
+        parent_->update_reflected_temperature_auto(initial_state.value());
       } else {
         parent_->update_roi_enabled(initial_state.value());
       }
@@ -1377,6 +1392,16 @@ void MLX90640Number::control(float value) {
     case ROI_SIZE:
       parent_->update_roi_size((int) value);
       ESP_LOGD("MLX90640Number", "ROI size changed to %d", (int) value);
+      break;
+
+    case EMISSIVITY:
+      parent_->update_emissivity(value);
+      ESP_LOGD("MLX90640Number", "Emissivity changed to %.3f", value);
+      break;
+
+    case REFLECTED_TEMPERATURE:
+      parent_->update_reflected_temperature(value);
+      ESP_LOGD("MLX90640Number", "Reflected temperature changed to %.1f°C", value);
       break;
 
     default:
@@ -1422,6 +1447,9 @@ void MLX90640Switch::write_state(bool state) {
   if (control_type_ == WEB_OVERLAY_ENABLED) {
     parent_->update_web_overlay_enabled(state);
     ESP_LOGD("MLX90640Switch", "Web overlay enabled changed to %s", state ? "true" : "false");
+  } else if (control_type_ == REFLECTED_TEMPERATURE_AUTO) {
+    parent_->update_reflected_temperature_auto(state);
+    ESP_LOGD("MLX90640Switch", "Reflected temperature auto changed to %s", state ? "true" : "false");
   } else {
     parent_->update_roi_enabled(state);
     ESP_LOGD("MLX90640Switch", "ROI enabled changed to %s", state ? "true" : "false");

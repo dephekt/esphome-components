@@ -13,6 +13,7 @@
 #include "MLX90640_API.h"
 #include "MLX90640_I2C_Driver.h"
 #include <algorithm>
+#include <cmath>
 #ifdef USE_NETWORK
 // Always include JPEGENC for JPEG generation
 #include <JPEGENC.h>
@@ -85,6 +86,16 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   void set_roi_max_sensor(sensor::Sensor *sensor) { roi_max_sensor_ = sensor; }
   void set_roi_avg_sensor(sensor::Sensor *sensor) { roi_avg_sensor_ = sensor; }
 
+  // Thermography parameter setters (static config)
+  void set_emissivity(float e) { emissivity_ = e; }
+  void set_ta_shift(float s) { ta_shift_ = s; }
+  void set_reflected_temperature(float t) { reflected_temperature_ = t; reflected_temperature_auto_ = false; }
+
+  // Thermography parameter runtime update methods (used by controls)
+  void update_emissivity(float e) { emissivity_ = e; }
+  void update_reflected_temperature(float t) { reflected_temperature_ = t; }
+  void update_reflected_temperature_auto(bool a) { reflected_temperature_auto_ = a; }
+
   // Auto-generated control entity setters
   void set_update_interval_control(number::Number *control) { update_interval_control_ = control; }
   void set_thermal_palette_control(select::Select *control) { thermal_palette_control_ = control; }
@@ -93,6 +104,9 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   void set_roi_center_col_control(number::Number *control) { roi_center_col_control_ = control; }
   void set_roi_size_control(number::Number *control) { roi_size_control_ = control; }
   void set_web_overlay_enabled_control(switch_::Switch *control) { web_overlay_enabled_control_ = control; }
+  void set_emissivity_control(number::Number *control) { emissivity_control_ = control; }
+  void set_reflected_temperature_control(number::Number *control) { reflected_temperature_control_ = control; }
+  void set_reflected_temperature_auto_control(switch_::Switch *control) { reflected_temperature_auto_control_ = control; }
 
   // Data access methods for external components
   bool is_initialized() const { return initialized_; }
@@ -163,9 +177,6 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   void add_temperature_text_to_image_(std::vector<uint16_t> &image_data, int img_width, int img_height);
 #endif
 
-  // Hardware configuration
-  static const int TA_SHIFT = 8;
-
   // Configuration
   std::string refresh_rate_{"16Hz"};
   std::string resolution_{"18-bit"};
@@ -173,6 +184,12 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   bool single_frame_{false};
   uint32_t update_interval_{20000};  // 20 seconds default
   ROIConfig roi_config_;
+
+  // Thermography parameters
+  float emissivity_{0.95f};
+  float reflected_temperature_{NAN};  // manual reflected-temperature value
+  bool reflected_temperature_auto_{true};  // true → tr = Ta − ta_shift_
+  float ta_shift_{8.0f};
 
   // Thermal palette configuration
   std::string thermal_palette_{"rainbow"};
@@ -227,6 +244,9 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   number::Number *roi_center_col_control_{nullptr};
   number::Number *roi_size_control_{nullptr};
   switch_::Switch *web_overlay_enabled_control_{nullptr};
+  number::Number *emissivity_control_{nullptr};
+  number::Number *reflected_temperature_control_{nullptr};
+  switch_::Switch *reflected_temperature_auto_control_{nullptr};
 
   // Timing
   uint32_t last_update_time_{0};
@@ -252,7 +272,10 @@ enum MLX90640ControlType {
   ROI_SIZE,
   THERMAL_PALETTE,
   ROI_ENABLED,
-  WEB_OVERLAY_ENABLED
+  WEB_OVERLAY_ENABLED,
+  EMISSIVITY,
+  REFLECTED_TEMPERATURE,
+  REFLECTED_TEMPERATURE_AUTO
 };
 
 // MLX90640Number - handles numeric controls (update interval, ROI settings)

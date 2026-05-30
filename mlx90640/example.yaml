@@ -36,6 +36,11 @@ mlx90640:
   single_frame: false         # true for motion artifact reduction
   update_interval: 10000      # Update every 10 seconds
 
+  # Thermography parameters (static config; overridden by runtime controls if wired up)
+  emissivity: 0.95            # Surface IR emissivity, 0.1–1.0 (default: 0.95)
+  # reflected_temperature: 22.0  # Foil-measured reflected temperature in °C; omit for auto
+  ta_shift: 8.0               # Auto-mode: tr = Ta − ta_shift (default: 8.0)
+
   # Auto-generated temperature sensors (optional)
   temperature_sensors:
     min:
@@ -97,6 +102,25 @@ mlx90640:
   # This is a switch to enable/disable the web overlay feature
   web_overlay_enabled_control:
     name: "Enable Image Overlay"
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # Thermography runtime controls (NVS-persisted, take effect next frame)
+  emissivity_control:
+    name: "Emissivity"
+    min_value: 0.1
+    max_value: 1.0
+    step: 0.01
+    restore_value: true
+
+  reflected_temperature_control:
+    name: "Reflected Temperature"
+    min_value: -40.0
+    max_value: 300.0
+    step: 0.5
+    restore_value: true
+
+  reflected_temperature_auto_control:
+    name: "Reflected Temperature Auto"
     restore_mode: RESTORE_DEFAULT_ON
 
   # ROI static configuration (used as initial/fallback values)
