@@ -67,7 +67,7 @@ sensor:
   - platform: ezo_types
     type: ph
     id: ph_sensor
-    name: "pH"
+    name: "Water pH"
     address: 99
     update_interval: 5s
     accuracy_decimals: 3
@@ -133,7 +133,7 @@ sensor:
   - platform: ezo_types
     type: ec
     id: ec_sensor
-    name: "EC"
+    name: "Water EC"
     address: 100
     update_interval: 5s
     power_control_switch: ec_enable
@@ -186,7 +186,7 @@ sensor:
   - platform: ezo_types
     type: rtd
     id: rtd_sensor
-    name: "Temperature"
+    name: "Water Temperature"
     address: 102
     update_interval: 5s
     power_control_switch: rtd_enable
@@ -228,7 +228,7 @@ sensor:
   - platform: ezo_types
     type: orp
     id: orp_sensor
-    name: "ORP"
+    name: "Water ORP"
     address: 98
     update_interval: 5s
     power_control_switch: orp_enable
