@@ -51,15 +51,27 @@ web_server:
     - id: ph_circuit
       name: "pH Circuit"
       sorting_weight: 10
+    - id: ph_slope
+      name: "pH Slope Quality"
+      sorting_weight: 12
+    - id: ph_cal
+      name: "pH Calibration"
+      sorting_weight: 14
     - id: ec_circuit
       name: "EC Circuit"
       sorting_weight: 20
+    - id: ec_cal
+      name: "EC Calibration"
+      sorting_weight: 22
     - id: rtd_circuit
       name: "RTD Circuit"
       sorting_weight: 30
     - id: orp_circuit
       name: "ORP Circuit"
       sorting_weight: 40
+    - id: orp_cal
+      name: "ORP Calibration"
+      sorting_weight: 42
     - id: diagnostic
       name: "Diagnostic"
       sorting_weight: 80
@@ -145,7 +157,7 @@ sensor:
     calibration_status:
       name: "pH Calibration Status"
       web_server:
-        sorting_group_id: ph_circuit
+        sorting_group_id: ph_cal
     temperature_compensation:
       name: "pH Temperature Compensation"
       web_server:
@@ -157,15 +169,15 @@ sensor:
     acid_slope_quality:
       name: "pH Acid Slope Quality"
       web_server:
-        sorting_group_id: ph_circuit
+        sorting_group_id: ph_slope
     alkaline_slope_quality:
       name: "pH Alkaline Slope Quality"
       web_server:
-        sorting_group_id: ph_circuit
+        sorting_group_id: ph_slope
     asymmetry_potential:
       name: "pH Asymmetry Potential"
       web_server:
-        sorting_group_id: ph_circuit
+        sorting_group_id: ph_slope
     current_command:
       name: "pH Current Command"
       web_server:
@@ -199,7 +211,7 @@ sensor:
     cell_constant:
       name: "EC Cell Constant"
       web_server:
-        sorting_group_id: ec_circuit
+        sorting_group_id: ec_cal
     voltage:
       name: "EC Voltage"
       web_server:
@@ -215,7 +227,7 @@ sensor:
     calibration_status:
       name: "EC Calibration Status"
       web_server:
-        sorting_group_id: ec_circuit
+        sorting_group_id: ec_cal
     temperature_compensation:
       name: "EC Temperature Compensation"
       web_server:
@@ -313,7 +325,7 @@ sensor:
     calibration_status:
       name: "ORP Calibration Status"
       web_server:
-        sorting_group_id: orp_circuit
+        sorting_group_id: orp_cal
     current_command:
       name: "ORP Current Command"
       web_server:
@@ -396,21 +408,21 @@ button:
   - platform: template
     name: "pH Cal Mid (7.00)"
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: ph_cal
     on_press:
       - lambda: 'id(ph_sensor).set_calibration_point_mid(7.00);'
 
   - platform: template
     name: "pH Cal Low (4.00)"
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: ph_cal
     on_press:
       - lambda: 'id(ph_sensor).set_calibration_point_low(4.00);'
 
   - platform: template
     name: "pH Cal High (10.00)"
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: ph_cal
     on_press:
       - lambda: 'id(ph_sensor).set_calibration_point_high(10.00);'
 
@@ -418,21 +430,21 @@ button:
   - platform: template
     name: "EC Dry Calibration"
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: ec_cal
     on_press:
       - lambda: 'id(ec_sensor).set_calibration_point_dry();'
 
   - platform: template
     name: "EC Cal Low (1413 µS/cm)"
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: ec_cal
     on_press:
       - lambda: 'id(ec_sensor).set_calibration_point_low(1413.0);'
 
   - platform: template
     name: "EC Cal High (5000 µS/cm)"
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: ec_cal
     on_press:
       - lambda: 'id(ec_sensor).set_calibration_point_high(5000.0);'
 
@@ -448,7 +460,7 @@ button:
   - platform: template
     name: "ORP Calibration (400 mV)"
     web_server:
-      sorting_group_id: orp_circuit
+      sorting_group_id: orp_cal
     on_press:
       - lambda: 'id(orp_sensor).set_calibration_generic(400.0);'
 
@@ -456,14 +468,14 @@ button:
   - platform: template
     name: "pH Clear Calibration"
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: ph_cal
     on_press:
       - lambda: 'id(ph_sensor).clear_calibration();'
 
   - platform: template
     name: "EC Clear Calibration"
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: ec_cal
     on_press:
       - lambda: 'id(ec_sensor).clear_calibration();'
 
@@ -477,7 +489,7 @@ button:
   - platform: template
     name: "ORP Clear Calibration"
     web_server:
-      sorting_group_id: orp_circuit
+      sorting_group_id: orp_cal
     on_press:
       - lambda: 'id(orp_sensor).clear_calibration();'
 
@@ -562,7 +574,7 @@ switch:
     id: ph_cal_mode_enable
     optimistic: true
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: ph_cal
     restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: template
@@ -570,5 +582,5 @@ switch:
     id: ec_cal_mode_enable
     optimistic: true
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: ec_cal
     restore_mode: RESTORE_DEFAULT_OFF
