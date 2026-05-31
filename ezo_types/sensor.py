@@ -20,10 +20,7 @@ from esphome.const import (
 
 from .select import CONF_CELL_CONSTANT, _cell_constant_select_schema
 from .switch import (
-    CONF_DATALOGGER,
     CONF_EXTENDED_SCALE,
-    CONF_INTERVAL,
-    _datalogger_switch_schema,
     _extended_scale_switch_schema,
 )
 
@@ -298,7 +295,6 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
-                cv.Optional(CONF_DATALOGGER): _datalogger_switch_schema(),
             }
         )
         .extend(cv.polling_component_schema("60s"))
@@ -462,14 +458,6 @@ async def to_code(config):
             await cg.register_component(num, tds_conversion_factor_config)
             cg.add(num.set_ec_sensor(var))
             cg.add(var.set_tds_conversion_factor_number(num))
-
-    elif sensor_type == "rtd":
-        if datalogger_config := config.get(CONF_DATALOGGER):
-            sw = await switch.new_switch(datalogger_config)
-            await cg.register_component(sw, datalogger_config)
-            cg.add(sw.set_rtd_sensor(var))
-            cg.add(sw.set_interval(datalogger_config[CONF_INTERVAL]))
-            cg.add(var.set_datalogger_switch(sw))
 
     elif sensor_type == "orp":
         if extended_scale_config := config.get(CONF_EXTENDED_SCALE):

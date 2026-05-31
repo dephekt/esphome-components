@@ -16,7 +16,6 @@ namespace ezo_types {
 class RTDSensor;
 class CellConstantSelect;
 class TDSConversionFactorNumber;
-class DataloggerSwitch;
 class ExtendedScaleSwitch;
 
 class EZOSensor : public ezo::EZOSensor {
@@ -194,18 +193,11 @@ class RTDSensor : public EZOSensor {
   void update() override;
   void dump_config() override;
 
-  void set_datalogger(bool enabled, int interval);
-  void request_datalogger_query();
-  void set_datalogger_switch(DataloggerSwitch *sw) { this->datalogger_switch_ = sw; }
-
  protected:
   void handle_custom_response_(const std::string &response) override;
   void parse_common_calibration_response_(const std::string &response) override;
   void parse_temp_scale_response_(const std::string &response);
-  void parse_datalogger_response_(const std::string &response);
   void check_temperature_change_(float new_temp);
-
-  DataloggerSwitch *datalogger_switch_{nullptr};
 
  public:
   float last_known_temperature_{NAN};

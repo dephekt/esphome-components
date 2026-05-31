@@ -7,26 +7,6 @@ namespace ezo_types {
 
 static const char *const TAG = "ezo_types.switch";
 
-void DataloggerSwitch::setup() {
-  // Sync the displayed state from the circuit on startup (read-only, no write-back).
-  if (this->rtd_sensor_ != nullptr) {
-    this->rtd_sensor_->request_datalogger_query();
-  }
-}
-
-void DataloggerSwitch::dump_config() {
-  LOG_SWITCH("", "Datalogger", this);
-  ESP_LOGCONFIG(TAG, "  Interval: %d s", this->interval_);
-}
-
-void DataloggerSwitch::write_state(bool state) {
-  if (this->rtd_sensor_) {
-    this->rtd_sensor_->set_datalogger(state, this->interval_);
-    this->publish_state(state);
-    ESP_LOGI(TAG, "Datalogger %s (interval %d s)", state ? "ENABLED" : "DISABLED", this->interval_);
-  }
-}
-
 void ExtendedScaleSwitch::setup() {
   // Sync the displayed state from the circuit on startup (read-only, no write-back).
   if (this->orp_sensor_ != nullptr) {

@@ -4,7 +4,7 @@ A typed, batteries-included ESPHome component for **Atlas Scientific EZO** circu
 (pH, EC/conductivity, RTD/temperature, ORP). It extends the stock `ezo` component
 (via `AUTO_LOAD: ["ezo"]`) and adds first-class entities for the things the bare
 `ezo` platform leaves you to wire up by hand: calibration, temperature
-compensation, cell constant, TDS, the datalogger, and per-circuit diagnostics.
+compensation, cell constant, TDS, and per-circuit diagnostics.
 
 Each circuit `type` is its own self-contained universe — the component is generic
 and makes no application-specific assumptions. Opinionation (which probe
@@ -18,7 +18,7 @@ not in the component.
   component feeds its temperature into the circuit's compensated read, gated by a switch.
 - **Component-owned config entities** that *read back* the circuit's actual stored
   state instead of being write-only: EC cell-constant `select`, TDS conversion-factor
-  `number`, RTD datalogger `switch`, ORP extended-scale `switch`.
+  `number`, ORP extended-scale `switch`.
 - **Rich diagnostics** per circuit: voltage, reset reason, firmware version,
   calibration status, the live command queue (current/next/last command, queue size),
   and pH probe-health sensors (slope quality, asymmetry potential).
@@ -52,9 +52,6 @@ sensor:
     name: "Water Temperature"
     address: 102
     update_interval: 5s
-    datalogger:                  # RTD-only: on-board logger switch
-      name: "RTD Datalogger"
-      interval: 60               # seconds between logged samples
 
   - platform: ezo_types
     type: ph
@@ -149,8 +146,7 @@ power control, calibration buttons, web-server sorting groups) lives at
 
 ### `rtd`
 
-- **datalogger** (*Optional*): a `switch` controlling the circuit's on-board logger,
-  with an **interval** (seconds) sub-key.
+No type-specific configuration keys; only the common options above apply.
 
 ### `orp`
 
@@ -205,16 +201,14 @@ sensor:
 
 The component-owned config entities mirror the circuit's *actual* stored state rather
 than being write-only. On startup each one queries the circuit (`K,?` for cell
-constant, `TDS,?` for the conversion factor, `D,?` for the datalogger, `ORPext,?` for
-extended scale) and publishes what it gets back, so the web UI and Home Assistant
-reflect reality instead of a default. Writing to the entity still sends the
-corresponding command to the circuit.
+constant, `TDS,?` for the conversion factor, `ORPext,?` for extended scale) and
+publishes what it gets back, so the web UI and Home Assistant reflect reality instead
+of a default. Writing to the entity still sends the corresponding command to the circuit.
 
-Two of these are **not power-retained** by the EZO firmware — the **datalogger** and
-the **ORP extended scale** reset to off on every power cut. Because the EZO circuits
-power-cycle whenever the ESP reboots, those two always read off at boot; that's the
-true state, not a bug. The **cell constant** and **TDS conversion factor** *are*
-retained and survive reboots.
+The **ORP extended scale** is **not power-retained** by the EZO firmware — it resets
+to off on every power cut. Because the EZO circuits power-cycle whenever the ESP
+reboots, it always reads off at boot; that's the true state, not a bug. The **cell
+constant** and **TDS conversion factor** *are* retained and survive reboots.
 
 ### Re-syncing on demand
 
@@ -232,7 +226,6 @@ button:
       - lambda: |-
           id(ec_sensor).request_cell_constant_query();
           id(ec_sensor).request_tds_query();
-          id(rtd_sensor).request_datalogger_query();
           id(orp_sensor).request_extended_scale_query();
 ```
 

@@ -279,11 +279,6 @@ sensor:
       name: "RTD Queue Size"
       web_server:
         sorting_group_id: rtd_circuit
-    datalogger:
-      name: "RTD Datalogger"
-      interval: 60
-      web_server:
-        sorting_group_id: rtd_circuit
 
   - platform: ezo_types
     type: orp
@@ -357,7 +352,6 @@ button:
       - lambda: |-
           id(ec_sensor).request_cell_constant_query();
           id(ec_sensor).request_tds_query();
-          id(rtd_sensor).request_datalogger_query();
           id(orp_sensor).request_extended_scale_query();
 
   # === Factory Reset ===

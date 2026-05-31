@@ -754,44 +754,12 @@ void RTDSensor::handle_custom_response_(const std::string &response) {
     return;
   }
 
-  // Handle datalogger interval response "?D,n"
-  const std::string dl_prefix = "?D,";
-  if (response.rfind(dl_prefix, 0) == 0) {
-    this->parse_datalogger_response_(response);
-    return;
-  }
-
   // Try common class responses if nothing else returned
   this->handle_common_responses_(response);
 }
 
 void RTDSensor::parse_temp_scale_response_(const std::string &response) {
   ESP_LOGI(TAG, "[RTD] Temperature scale: %s", response.c_str());
-}
-
-void RTDSensor::parse_datalogger_response_(const std::string &response) {
-  const std::string dl_prefix = "?D,";
-  std::string interval_str = response.substr(dl_prefix.size());
-  int interval = parse_number<int>(interval_str).value_or(0);
-
-  bool enabled = (interval != 0);
-  // Display-only sync: reflect the circuit's datalogger state on the switch.
-  if (this->datalogger_switch_ != nullptr) {
-    this->datalogger_switch_->publish_state(enabled);
-  }
-  ESP_LOGI(TAG, "[RTD] Datalogger %s (interval %d s)", enabled ? "ENABLED" : "DISABLED", interval);
-}
-
-void RTDSensor::set_datalogger(bool enabled, int interval) {
-  std::string cmd = enabled ? "D," + to_string(interval) : std::string("D,0");
-  this->add_command_(cmd.c_str(), ezo::EzoCommandType::EZO_CUSTOM, 300);
-}
-
-void RTDSensor::request_datalogger_query() {
-  if (this->is_circuit_powered_()) {
-    this->send_custom("D,?");
-    ESP_LOGD(TAG, "[RTD] Requesting datalogger state");
-  }
 }
 
 void ORPSensor::update() {
