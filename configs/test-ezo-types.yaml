@@ -43,35 +43,33 @@ web_server:
   port: 80
 
   sorting_groups:
-    # The four headline readings, pulled out of their circuit groups so you can
-    # watch them together without hunting through the per-circuit diagnostics.
+    # Layout order -- Configuration and Diagnostic are pinned to the top by
+    # web_server v3, then: At a Glance, the calibration sections, and finally
+    # the per-circuit detail groups.
     - id: overview
       name: "At a Glance"
       sorting_weight: 5
-    - id: ph_circuit
-      name: "pH Circuit"
-      sorting_weight: 10
-    - id: ph_slope
-      name: "pH Slope Quality"
-      sorting_weight: 12
     - id: ph_cal
       name: "pH Calibration"
-      sorting_weight: 14
-    - id: ec_circuit
-      name: "EC Circuit"
-      sorting_weight: 20
+      sorting_weight: 10
     - id: ec_cal
       name: "EC Calibration"
+      sorting_weight: 12
+    - id: orp_cal
+      name: "ORP Calibration"
+      sorting_weight: 14
+    - id: ph_circuit
+      name: "pH Circuit"
+      sorting_weight: 20
+    - id: ec_circuit
+      name: "EC Circuit"
       sorting_weight: 22
     - id: rtd_circuit
       name: "RTD Circuit"
-      sorting_weight: 30
+      sorting_weight: 24
     - id: orp_circuit
       name: "ORP Circuit"
-      sorting_weight: 40
-    - id: orp_cal
-      name: "ORP Calibration"
-      sorting_weight: 42
+      sorting_weight: 26
     - id: diagnostic
       name: "Diagnostic"
       sorting_weight: 80
@@ -169,15 +167,15 @@ sensor:
     acid_slope_quality:
       name: "pH Acid Slope Quality"
       web_server:
-        sorting_group_id: ph_slope
+        sorting_group_id: ph_cal
     alkaline_slope_quality:
       name: "pH Alkaline Slope Quality"
       web_server:
-        sorting_group_id: ph_slope
+        sorting_group_id: ph_cal
     asymmetry_potential:
       name: "pH Asymmetry Potential"
       web_server:
-        sorting_group_id: ph_slope
+        sorting_group_id: ph_cal
     current_command:
       name: "pH Current Command"
       web_server:
