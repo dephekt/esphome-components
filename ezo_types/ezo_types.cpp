@@ -404,6 +404,15 @@ void PHSensor::parse_slope_response_(const std::string &response) {
 
 void ECSensor::setup() {
   EZOSensor::setup();  // Call parent setup - handles all standard EZO functionality
+
+  // Enable/disable outputs to match configured sub-sensors so the R CSV order is deterministic.
+  // EC is always enabled; TDS/SAL/SG mirror whether the sub-sensor is wired.
+  if (this->is_circuit_powered_()) {
+    this->add_command_("O,EC,1", ezo::EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_(this->tds_sensor_ ? "O,TDS,1" : "O,TDS,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_(this->salinity_sensor_ ? "O,S,1" : "O,S,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_(this->relative_density_sensor_ ? "O,SG,1" : "O,SG,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+  }
   // Cell constant query will be requested by the select component's setup() method
 }
 
@@ -453,6 +462,98 @@ void ECSensor::request_cell_constant_query() {
   if (this->is_circuit_powered_()) {
     this->send_custom("K,?");
     ESP_LOGD(TAG, "[EC] Requesting cell constant");
+  }
+}
+
+void ECSensor::set_tds_conversion_factor(float factor) {
+  std::string cmd = "TDS," + to_string(factor);
+  this->add_command_(cmd.c_str(), ezo::EzoCommandType::EZO_CUSTOM, 300);
+}
+
+void ECSensor::loop() {
+  // When sub-sensors are configured we need the full CSV from the R response before
+  // ezo::EZOSensor::loop() truncates it at the first comma.  Intercept EZO_READ commands
+  // that are ready to be read and parse the raw I2C bytes ourselves.
+  if ((this->tds_sensor_ || this->salinity_sensor_ || this->relative_density_sensor_) &&
+      !this->commands_.empty()) {
+    auto *front = this->commands_.front().get();
+    if (front->command_type == ezo::EzoCommandType::EZO_READ && front->command_sent &&
+        (millis() - this->start_time_ >= front->delay_ms)) {
+      uint8_t buf[64];
+      buf[0] = 0;
+      if (!this->read_bytes_raw(buf, sizeof(buf))) {
+        ESP_LOGE(TAG, "[EC] read error");
+        this->commands_.pop_front();
+        return;
+      }
+      switch (buf[0]) {
+        case 1:
+          break;
+        case 2:
+          ESP_LOGE(TAG, "[EC] device returned a syntax error");
+          this->commands_.pop_front();
+          return;
+        case 254:
+          return;  // keep waiting
+        case 255:
+          ESP_LOGE(TAG, "[EC] device returned no data");
+          this->commands_.pop_front();
+          return;
+        default:
+          ESP_LOGE(TAG, "[EC] device returned unknown response: %d", buf[0]);
+          this->commands_.pop_front();
+          return;
+      }
+      std::string payload = reinterpret_cast<char *>(&buf[1]);
+      this->commands_.pop_front();
+      // Log completion so the diagnostic tracking in the parent loop() picks it up
+      this->last_completed_command_ = "R";
+      this->parse_reading_csv_(payload);
+      // Continue with the rest of the queue via the parent (not calling ezo:: directly again)
+      ezo_types::EZOSensor::loop();
+      return;
+    }
+  }
+  // Default path: delegate to the ezo_types base loop (power/warm-up logic + ezo base loop)
+  ezo_types::EZOSensor::loop();
+}
+
+void ECSensor::parse_reading_csv_(const std::string &response) {
+  // The R response CSV has the enabled outputs in FIXED order: EC, TDS, SAL, SG.
+  // setup() enabled exactly the outputs that have a configured sub-sensor, so the
+  // fields present here map 1:1 to: EC (always), then TDS if tds_sensor_, etc.
+  std::vector<std::string> fields;
+  std::string remainder = response;
+  size_t pos;
+  while ((pos = remainder.find(',')) != std::string::npos) {
+    fields.push_back(remainder.substr(0, pos));
+    remainder.erase(0, pos + 1);
+  }
+  fields.push_back(remainder);
+
+  // Field 0 is always EC
+  if (!fields.empty()) {
+    float ec_val = parse_number<float>(fields[0]).value_or(NAN);
+    this->publish_state(ec_val);
+    ESP_LOGI(TAG, "[EC] EC: %.2f µS/cm", ec_val);
+  }
+
+  // Remaining fields fill TDS → SAL → SG in order, only for enabled sub-sensors
+  size_t field_idx = 1;
+  if (this->tds_sensor_ && field_idx < fields.size()) {
+    float tds_val = parse_number<float>(fields[field_idx++]).value_or(NAN);
+    this->tds_sensor_->publish_state(tds_val);
+    ESP_LOGI(TAG, "[EC] TDS: %.0f ppm", tds_val);
+  }
+  if (this->salinity_sensor_ && field_idx < fields.size()) {
+    float sal_val = parse_number<float>(fields[field_idx++]).value_or(NAN);
+    this->salinity_sensor_->publish_state(sal_val);
+    ESP_LOGI(TAG, "[EC] Salinity: %.2f PSU", sal_val);
+  }
+  if (this->relative_density_sensor_ && field_idx < fields.size()) {
+    float sg_val = parse_number<float>(fields[field_idx++]).value_or(NAN);
+    this->relative_density_sensor_->publish_state(sg_val);
+    ESP_LOGI(TAG, "[EC] Specific Gravity: %.3f", sg_val);
   }
 }
 
@@ -656,6 +757,11 @@ void RTDSensor::parse_datalogger_response_(const std::string &response) {
   ESP_LOGI(TAG, "[RTD] Datalogger %s (interval %d s)", enabled ? "ENABLED" : "DISABLED", interval);
 }
 
+void RTDSensor::set_datalogger(bool enabled, int interval) {
+  std::string cmd = enabled ? "D," + to_string(interval) : std::string("D,0");
+  this->add_command_(cmd.c_str(), ezo::EzoCommandType::EZO_CUSTOM, 300);
+}
+
 void ORPSensor::update() {
   // Call parent update first
   EZOSensor::update();
@@ -718,14 +824,16 @@ void ORPSensor::parse_extended_scale_response_(const std::string &response) {
   ESP_LOGI(TAG, "[ORP] Extended scale %s", enabled ? "ENABLED" : "DISABLED");
 }
 
+void ORPSensor::set_extended_scale(bool enabled) {
+  this->add_command_(enabled ? "ORPext,1" : "ORPext,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+}
+
 void TDSConversionFactorNumber::set_ec_sensor(ECSensor *ec_sensor) { ec_sensor_ = ec_sensor; }
 
 void TDSConversionFactorNumber::control(float value) {
   if (ec_sensor_) {
-    char command[16];
-    snprintf(command, sizeof(command), "TDS,%.2f", value);
-    ec_sensor_->send_custom(command);
-    publish_state(value);
+    ec_sensor_->set_tds_conversion_factor(value);
+    this->publish_state(value);
     ESP_LOGI(TAG, "[TDS CF] Set conversion factor to %.2f", value);
   }
 }

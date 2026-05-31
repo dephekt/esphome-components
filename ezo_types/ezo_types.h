@@ -148,6 +148,7 @@ class ECSensor : public EZOSensor {
   void setup() override;
   void update() override;
   void dump_config() override;
+  void loop() override;
 
   void add_cell_constant_callback(std::function<void(float)> &&callback) {
     cell_constant_callback_.add(std::move(callback));
@@ -158,6 +159,12 @@ class ECSensor : public EZOSensor {
   void set_cell_constant_select(CellConstantSelect *cell_constant_select) {
     this->cell_constant_select_ = cell_constant_select;
   }
+  void set_tds_sensor(sensor::Sensor *tds_sensor) { tds_sensor_ = tds_sensor; }
+  void set_salinity_sensor(sensor::Sensor *salinity_sensor) { salinity_sensor_ = salinity_sensor; }
+  void set_relative_density_sensor(sensor::Sensor *relative_density_sensor) {
+    relative_density_sensor_ = relative_density_sensor;
+  }
+  void set_tds_conversion_factor(float factor);
   void set_cell_constant(const std::string &value);
   void request_cell_constant_query();
   // EC-specific calibration methods
@@ -168,10 +175,14 @@ class ECSensor : public EZOSensor {
   void parse_common_calibration_response_(const std::string &response) override;
   void parse_cell_constant_response_(const std::string &response);
   void parse_temperature_compensation_response_(const std::string &response);
+  void parse_reading_csv_(const std::string &response);
 
   CallbackManager<void(float)> cell_constant_callback_{};
   sensor::Sensor *temperature_compensation_sensor_{nullptr};
   CellConstantSelect *cell_constant_select_{nullptr};
+  sensor::Sensor *tds_sensor_{nullptr};
+  sensor::Sensor *salinity_sensor_{nullptr};
+  sensor::Sensor *relative_density_sensor_{nullptr};
 };
 
 class RTDSensor : public EZOSensor {
@@ -189,6 +200,7 @@ class RTDSensor : public EZOSensor {
   void add_temperature_change_callback(std::function<void(float)> &&callback) {
     temperature_change_callback_.add(std::move(callback));
   }
+  void set_datalogger(bool enabled, int interval);
 
  protected:
   void handle_custom_response_(const std::string &response) override;
@@ -216,6 +228,7 @@ class ORPSensor : public EZOSensor {
   void add_extended_scale_callback(std::function<void(bool)> &&callback) {
     extended_scale_callback_.add(std::move(callback));
   }
+  void set_extended_scale(bool enabled);
 
  protected:
   void handle_custom_response_(const std::string &response) override;

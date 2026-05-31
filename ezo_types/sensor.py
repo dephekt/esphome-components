@@ -19,10 +19,17 @@ from esphome.const import (
 )
 
 from .select import CONF_CELL_CONSTANT, _cell_constant_select_schema
+from .switch import (
+    CONF_DATALOGGER,
+    CONF_EXTENDED_SCALE,
+    CONF_INTERVAL,
+    _datalogger_switch_schema,
+    _extended_scale_switch_schema,
+)
 
 CODEOWNERS = ["@dephekt"]
 AUTO_LOAD = ["ezo"]
-DEPENDENCIES = ["i2c", "select"]
+DEPENDENCIES = ["i2c", "select", "switch"]
 
 CONF_TYPE = "type"
 CONF_POWER_CONTROL_SWITCH = "power_control_switch"
@@ -138,6 +145,32 @@ def _tds_conversion_factor_number_schema():
     )
 
 
+def _tds_sensor_schema():
+    return sensor.sensor_schema(
+        unit_of_measurement="ppm",
+        accuracy_decimals=0,
+        state_class=STATE_CLASS_MEASUREMENT,
+        icon="mdi:water-opacity",
+    )
+
+
+def _salinity_sensor_schema():
+    return sensor.sensor_schema(
+        unit_of_measurement="PSU",
+        accuracy_decimals=2,
+        state_class=STATE_CLASS_MEASUREMENT,
+        icon="mdi:shaker-outline",
+    )
+
+
+def _relative_density_sensor_schema():
+    return sensor.sensor_schema(
+        accuracy_decimals=3,
+        state_class=STATE_CLASS_MEASUREMENT,
+        icon="mdi:water",
+    )
+
+
 def _acid_slope_quality_sensor_schema():
     return sensor.sensor_schema(
         unit_of_measurement="%",
@@ -233,6 +266,12 @@ CONFIG_SCHEMA = cv.typed_schema(
                     CONF_TEMPERATURE_COMPENSATION
                 ): _temperature_compensation_sensor_schema(),
                 cv.Optional(CONF_CELL_CONSTANT): _cell_constant_select_schema(),
+                cv.Optional(CONF_TDS): _tds_sensor_schema(),
+                cv.Optional(CONF_SALINITY): _salinity_sensor_schema(),
+                cv.Optional(CONF_RELATIVE_DENSITY): _relative_density_sensor_schema(),
+                cv.Optional(
+                    CONF_TDS_CONVERSION_FACTOR
+                ): _tds_conversion_factor_number_schema(),
             }
         )
         .extend(cv.polling_component_schema("60s"))
@@ -259,6 +298,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
+                cv.Optional(CONF_DATALOGGER): _datalogger_switch_schema(),
             }
         )
         .extend(cv.polling_component_schema("60s"))
@@ -285,6 +325,7 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
+                cv.Optional(CONF_EXTENDED_SCALE): _extended_scale_switch_schema(),
             }
         )
         .extend(cv.polling_component_schema("60s"))
@@ -399,8 +440,37 @@ async def to_code(config):
             cg.add(var.set_cell_constant_select(cell_constant_select))
             cg.add(cell_constant_select.set_ec_sensor(var))
 
+        if tds_config := config.get(CONF_TDS):
+            tds_sensor = await sensor.new_sensor(tds_config)
+            cg.add(var.set_tds_sensor(tds_sensor))
+
+        if salinity_config := config.get(CONF_SALINITY):
+            salinity_sensor = await sensor.new_sensor(salinity_config)
+            cg.add(var.set_salinity_sensor(salinity_sensor))
+
+        if relative_density_config := config.get(CONF_RELATIVE_DENSITY):
+            relative_density_sensor = await sensor.new_sensor(relative_density_config)
+            cg.add(var.set_relative_density_sensor(relative_density_sensor))
+
+        if tds_conversion_factor_config := config.get(CONF_TDS_CONVERSION_FACTOR):
+            num = await number.new_number(
+                tds_conversion_factor_config,
+                min_value=0.01,
+                max_value=2.0,
+                step=0.01,
+            )
+            await cg.register_component(num, tds_conversion_factor_config)
+            cg.add(num.set_ec_sensor(var))
+
     elif sensor_type == "rtd":
-        pass
+        if datalogger_config := config.get(CONF_DATALOGGER):
+            sw = await switch.new_switch(datalogger_config)
+            await cg.register_component(sw, datalogger_config)
+            cg.add(sw.set_rtd_sensor(var))
+            cg.add(sw.set_interval(datalogger_config[CONF_INTERVAL]))
 
     elif sensor_type == "orp":
-        pass
+        if extended_scale_config := config.get(CONF_EXTENDED_SCALE):
+            sw = await switch.new_switch(extended_scale_config)
+            await cg.register_component(sw, extended_scale_config)
+            cg.add(sw.set_orp_sensor(var))
