@@ -49,6 +49,9 @@ web_server:
     - id: overview
       name: "At a Glance"
       sorting_weight: 5
+    - id: temp_comp
+      name: "Temperature Compensation"
+      sorting_weight: 8
     - id: ph_cal
       name: "pH Calibration"
       sorting_weight: 10
@@ -159,7 +162,7 @@ sensor:
     temperature_compensation:
       name: "pH Temperature Compensation"
       web_server:
-        sorting_group_id: ph_circuit
+        sorting_group_id: temp_comp
     on_slope:
       - logger.log:
           format: "[PH] Slope: %s mV/pH"
@@ -229,7 +232,7 @@ sensor:
     temperature_compensation:
       name: "EC Temperature Compensation"
       web_server:
-        sorting_group_id: ec_circuit
+        sorting_group_id: temp_comp
     current_command:
       name: "EC Current Command"
       web_server:
@@ -555,7 +558,7 @@ switch:
     id: ph_temp_comp_enable
     optimistic: true
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: temp_comp
     restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: template
@@ -563,7 +566,7 @@ switch:
     id: ec_temp_comp_enable
     optimistic: true
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: temp_comp
     restore_mode: RESTORE_DEFAULT_OFF
 
   # === Calibration Mode Control ===
