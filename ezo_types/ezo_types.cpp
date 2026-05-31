@@ -465,6 +465,13 @@ void ECSensor::request_cell_constant_query() {
   }
 }
 
+void ECSensor::request_tds_query() {
+  if (this->is_circuit_powered_()) {
+    this->send_custom("TDS,?");
+    ESP_LOGD(TAG, "[EC] Requesting TDS conversion factor");
+  }
+}
+
 void ECSensor::set_tds_conversion_factor(float factor) {
   std::string cmd = "TDS," + to_string(factor);
   this->add_command_(cmd.c_str(), ezo::EzoCommandType::EZO_CUSTOM, 300);
@@ -567,6 +574,13 @@ void ECSensor::handle_custom_response_(const std::string &response) {
     return;
   }
 
+  // Handle TDS conversion factor query response "?TDS,0.54"
+  const std::string tds_prefix = "?TDS,";
+  if (response.rfind(tds_prefix, 0) == 0) {
+    this->parse_tds_response_(response);
+    return;
+  }
+
   // Check for STATUS response first - don't process further if it's a STATUS
   if (response.rfind("?STATUS,", 0) == 0) {
     this->handle_common_responses_(response);
@@ -649,6 +663,17 @@ void ECSensor::parse_cell_constant_response_(const std::string &response) {
     this->cell_constant_select_->publish_state(normalized_value);
   }
   ESP_LOGI(TAG, "[EC] Cell Constant: %s (normalized to %s)", cell_constant_str.c_str(), normalized_value.c_str());
+}
+
+void ECSensor::parse_tds_response_(const std::string &response) {
+  const std::string tds_prefix = "?TDS,";
+  std::string factor_str = response.substr(tds_prefix.size());
+  float factor = parse_number<float>(factor_str).value_or(0.0f);
+  // Display-only sync: reflect the circuit's stored factor without re-sending it.
+  if (this->tds_conversion_factor_number_) {
+    this->tds_conversion_factor_number_->publish_state(factor);
+  }
+  ESP_LOGI(TAG, "[EC] TDS Conversion Factor: %.2f", factor);
 }
 
 void RTDSensor::setup() {
@@ -826,6 +851,13 @@ void ORPSensor::parse_extended_scale_response_(const std::string &response) {
 
 void ORPSensor::set_extended_scale(bool enabled) {
   this->add_command_(enabled ? "ORPext,1" : "ORPext,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+}
+
+void TDSConversionFactorNumber::setup() {
+  // Sync the displayed factor from the circuit on startup (read-only, no write-back).
+  if (this->ec_sensor_ != nullptr) {
+    this->ec_sensor_->request_tds_query();
+  }
 }
 
 void TDSConversionFactorNumber::set_ec_sensor(ECSensor *ec_sensor) { ec_sensor_ = ec_sensor; }

@@ -461,6 +461,7 @@ async def to_code(config):
             )
             await cg.register_component(num, tds_conversion_factor_config)
             cg.add(num.set_ec_sensor(var))
+            cg.add(var.set_tds_conversion_factor_number(num))
 
     elif sensor_type == "rtd":
         if datalogger_config := config.get(CONF_DATALOGGER):

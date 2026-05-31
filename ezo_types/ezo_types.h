@@ -15,6 +15,7 @@ namespace ezo_types {
 // Forward declarations
 class RTDSensor;
 class CellConstantSelect;
+class TDSConversionFactorNumber;
 
 class EZOSensor : public ezo::EZOSensor {
  public:
@@ -167,6 +168,8 @@ class ECSensor : public EZOSensor {
   void set_tds_conversion_factor(float factor);
   void set_cell_constant(const std::string &value);
   void request_cell_constant_query();
+  void request_tds_query();
+  void set_tds_conversion_factor_number(TDSConversionFactorNumber *num) { this->tds_conversion_factor_number_ = num; }
   // EC-specific calibration methods
   void set_calibration_point_dry();
 
@@ -174,12 +177,14 @@ class ECSensor : public EZOSensor {
   void handle_custom_response_(const std::string &response) override;
   void parse_common_calibration_response_(const std::string &response) override;
   void parse_cell_constant_response_(const std::string &response);
+  void parse_tds_response_(const std::string &response);
   void parse_temperature_compensation_response_(const std::string &response);
   void parse_reading_csv_(const std::string &response);
 
   CallbackManager<void(float)> cell_constant_callback_{};
   sensor::Sensor *temperature_compensation_sensor_{nullptr};
   CellConstantSelect *cell_constant_select_{nullptr};
+  TDSConversionFactorNumber *tds_conversion_factor_number_{nullptr};
   sensor::Sensor *tds_sensor_{nullptr};
   sensor::Sensor *salinity_sensor_{nullptr};
   sensor::Sensor *relative_density_sensor_{nullptr};
@@ -240,6 +245,7 @@ class ORPSensor : public EZOSensor {
 
 class TDSConversionFactorNumber : public number::Number, public Component {
  public:
+  void setup() override;
   void set_ec_sensor(ECSensor *ec_sensor);
 
  protected:
