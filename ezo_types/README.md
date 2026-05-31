@@ -85,7 +85,7 @@ sensor:
     name: "Water ORP"
     address: 98
     update_interval: 5s
-    extended_scale:              # ORP-only: ±2000 mV extended-scale switch
+    extended_scale:              # ORP-only: widen range to ±2040 mV (±2 mV accuracy)
       name: "ORP Extended Scale"
 
 switch:
@@ -150,7 +150,10 @@ No type-specific configuration keys; only the common options above apply.
 
 ### `orp`
 
-- **extended_scale** (*Optional*): a `switch` toggling the ±2000 mV extended scale.
+- **extended_scale** (*Optional*): a `switch` toggling the ORP circuit's extended
+  reading range. Off (the default) the circuit reads ±1020 mV at ±1 mV accuracy; on,
+  the range widens to ±2040 mV but accuracy drops to ±2 mV. Leave it off unless you
+  need to read beyond ±1020 mV.
 
 ## Temperature compensation and units
 
