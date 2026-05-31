@@ -105,7 +105,7 @@ switch:
 
 A complete, working reference config (all four circuits, every diagnostic, GPIO
 power control, calibration buttons, web-server sorting groups) lives at
-[`configs/test-ezo-types.yaml`](../configs/test-ezo-types.yaml).
+[`configs/atlas-hydro-kit.yaml`](../configs/atlas-hydro-kit.yaml).
 
 ## Configuration variables
 
