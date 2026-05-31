@@ -16,6 +16,7 @@ namespace ezo_types {
 class RTDSensor;
 class CellConstantSelect;
 class TDSConversionFactorNumber;
+class ExtendedScaleSwitch;
 
 class EZOSensor : public ezo::EZOSensor {
  public:
@@ -192,13 +193,10 @@ class RTDSensor : public EZOSensor {
   void update() override;
   void dump_config() override;
 
-  void set_datalogger(bool enabled, int interval);
-
  protected:
   void handle_custom_response_(const std::string &response) override;
   void parse_common_calibration_response_(const std::string &response) override;
   void parse_temp_scale_response_(const std::string &response);
-  void parse_datalogger_response_(const std::string &response);
   void check_temperature_change_(float new_temp);
 
  public:
@@ -214,11 +212,15 @@ class ORPSensor : public EZOSensor {
   void dump_config() override;
 
   void set_extended_scale(bool enabled);
+  void request_extended_scale_query();
+  void set_extended_scale_switch(ExtendedScaleSwitch *sw) { this->extended_scale_switch_ = sw; }
 
  protected:
   void handle_custom_response_(const std::string &response) override;
   void parse_common_calibration_response_(const std::string &response) override;
   void parse_extended_scale_response_(const std::string &response);
+
+  ExtendedScaleSwitch *extended_scale_switch_{nullptr};
 };
 
 class TDSConversionFactorNumber : public number::Number, public Component {

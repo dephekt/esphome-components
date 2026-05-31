@@ -279,11 +279,6 @@ sensor:
       name: "RTD Queue Size"
       web_server:
         sorting_group_id: rtd_circuit
-    datalogger:
-      name: "RTD Datalogger"
-      interval: 60
-      web_server:
-        sorting_group_id: rtd_circuit
 
   - platform: ezo_types
     type: orp
@@ -347,6 +342,18 @@ sensor:
 select:
 
 button:
+  # === Diagnostic: re-query the persisted state from each circuit on demand ===
+  - platform: template
+    name: "Refresh Circuit State"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: diagnostic
+    on_press:
+      - lambda: |-
+          id(ec_sensor).request_cell_constant_query();
+          id(ec_sensor).request_tds_query();
+          id(orp_sensor).request_extended_scale_query();
+
   # === Factory Reset ===
   - platform: template
     name: "pH Factory Reset"

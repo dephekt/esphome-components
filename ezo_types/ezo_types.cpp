@@ -1,5 +1,6 @@
 #include "ezo_types.h"
 #include "select.h"
+#include "switch.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 
@@ -753,33 +754,12 @@ void RTDSensor::handle_custom_response_(const std::string &response) {
     return;
   }
 
-  // Handle datalogger interval response "?D,n"
-  const std::string dl_prefix = "?D,";
-  if (response.rfind(dl_prefix, 0) == 0) {
-    this->parse_datalogger_response_(response);
-    return;
-  }
-
   // Try common class responses if nothing else returned
   this->handle_common_responses_(response);
 }
 
 void RTDSensor::parse_temp_scale_response_(const std::string &response) {
   ESP_LOGI(TAG, "[RTD] Temperature scale: %s", response.c_str());
-}
-
-void RTDSensor::parse_datalogger_response_(const std::string &response) {
-  const std::string dl_prefix = "?D,";
-  std::string interval_str = response.substr(dl_prefix.size());
-  int interval = parse_number<int>(interval_str).value_or(0);
-
-  bool enabled = (interval != 0);
-  ESP_LOGI(TAG, "[RTD] Datalogger %s (interval %d s)", enabled ? "ENABLED" : "DISABLED", interval);
-}
-
-void RTDSensor::set_datalogger(bool enabled, int interval) {
-  std::string cmd = enabled ? "D," + to_string(interval) : std::string("D,0");
-  this->add_command_(cmd.c_str(), ezo::EzoCommandType::EZO_CUSTOM, 300);
 }
 
 void ORPSensor::update() {
@@ -839,11 +819,22 @@ void ORPSensor::parse_extended_scale_response_(const std::string &response) {
   int state = parse_number<int>(state_str).value_or(0);
 
   bool enabled = (state == 1);
+  // Display-only sync: reflect the circuit's extended-scale state on the switch.
+  if (this->extended_scale_switch_ != nullptr) {
+    this->extended_scale_switch_->publish_state(enabled);
+  }
   ESP_LOGI(TAG, "[ORP] Extended scale %s", enabled ? "ENABLED" : "DISABLED");
 }
 
 void ORPSensor::set_extended_scale(bool enabled) {
   this->add_command_(enabled ? "ORPext,1" : "ORPext,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+}
+
+void ORPSensor::request_extended_scale_query() {
+  if (this->is_circuit_powered_()) {
+    this->send_custom("ORPext,?");
+    ESP_LOGD(TAG, "[ORP] Requesting extended scale state");
+  }
 }
 
 void TDSConversionFactorNumber::setup() {
