@@ -184,6 +184,13 @@ User-adjustable threshold controls support:
 - **step**: Adjustment step size
 - **unit_of_measurement**: Display unit
 - **icon**: Display icon
+- **restore_value**: Persist Home Assistant adjustments across reboots
+  (default `true`).
+
+Each threshold control is seeded from its matching YAML threshold (e.g.
+`co2_high_threshold`) via the number's `initial_value`. On first boot it shows
+that value; with `restore_value: true` a later Home Assistant adjustment is
+restored on subsequent boots.
 
 Available controls:
 - **co2_high_threshold_number**, **co2_low_threshold_number**
