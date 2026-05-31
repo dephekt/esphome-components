@@ -233,14 +233,6 @@ sensor:
       name: "Water TDS"
       web_server:
         sorting_group_id: ec_circuit
-    salinity:
-      name: "Water Salinity"
-      web_server:
-        sorting_group_id: ec_circuit
-    relative_density:
-      name: "Water Specific Gravity"
-      web_server:
-        sorting_group_id: ec_circuit
     tds_conversion_factor:
       name: "EC TDS Conversion Factor"
       web_server:
