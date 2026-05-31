@@ -469,9 +469,11 @@ async def to_code(config):
             await cg.register_component(sw, datalogger_config)
             cg.add(sw.set_rtd_sensor(var))
             cg.add(sw.set_interval(datalogger_config[CONF_INTERVAL]))
+            cg.add(var.set_datalogger_switch(sw))
 
     elif sensor_type == "orp":
         if extended_scale_config := config.get(CONF_EXTENDED_SCALE):
             sw = await switch.new_switch(extended_scale_config)
             await cg.register_component(sw, extended_scale_config)
             cg.add(sw.set_orp_sensor(var))
+            cg.add(var.set_extended_scale_switch(sw))

@@ -12,6 +12,7 @@ class ORPSensor;
 
 class DataloggerSwitch : public switch_::Switch, public Component {
  public:
+  void setup() override;
   void dump_config() override;
   void set_rtd_sensor(RTDSensor *rtd_sensor) { rtd_sensor_ = rtd_sensor; }
   void set_interval(int s) { interval_ = s; }
@@ -25,6 +26,7 @@ class DataloggerSwitch : public switch_::Switch, public Component {
 
 class ExtendedScaleSwitch : public switch_::Switch, public Component {
  public:
+  void setup() override;
   void dump_config() override;
   void set_orp_sensor(ORPSensor *orp_sensor) { orp_sensor_ = orp_sensor; }
 
