@@ -43,6 +43,11 @@ web_server:
   port: 80
 
   sorting_groups:
+    # The four headline readings, pulled out of their circuit groups so you can
+    # watch them together without hunting through the per-circuit diagnostics.
+    - id: overview
+      name: "At a Glance"
+      sorting_weight: 5
     - id: ph_circuit
       name: "pH Circuit"
       sorting_weight: 10
@@ -123,7 +128,8 @@ sensor:
     temp_compensation_switch: ph_temp_comp_enable
     calibration_mode_switch: ph_cal_mode_enable
     web_server:
-      sorting_group_id: ph_circuit
+      sorting_group_id: overview
+      sorting_weight: 10
     voltage:
       name: "pH Voltage"
       web_server:
@@ -188,7 +194,8 @@ sensor:
     temp_compensation_switch: ec_temp_comp_enable
     calibration_mode_switch: ec_cal_mode_enable
     web_server:
-      sorting_group_id: ec_circuit
+      sorting_group_id: overview
+      sorting_weight: 30
     cell_constant:
       name: "EC Cell Constant"
       web_server:
@@ -246,7 +253,8 @@ sensor:
     update_interval: 5s
     power_control_switch: rtd_enable
     web_server:
-      sorting_group_id: rtd_circuit
+      sorting_group_id: overview
+      sorting_weight: 20
     voltage:
       name: "RTD Voltage"
       web_server:
@@ -288,7 +296,8 @@ sensor:
     update_interval: 5s
     power_control_switch: aux_enable
     web_server:
-      sorting_group_id: orp_circuit
+      sorting_group_id: overview
+      sorting_weight: 40
     voltage:
       name: "ORP Voltage"
       web_server:
