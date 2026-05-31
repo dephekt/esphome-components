@@ -58,6 +58,9 @@ web_server:
     - id: ec_cal
       name: "EC Calibration"
       sorting_weight: 12
+    - id: rtd_cal
+      name: "RTD Calibration"
+      sorting_weight: 13
     - id: orp_cal
       name: "ORP Calibration"
       sorting_weight: 14
@@ -283,7 +286,7 @@ sensor:
     calibration_status:
       name: "RTD Calibration Status"
       web_server:
-        sorting_group_id: rtd_circuit
+        sorting_group_id: rtd_cal
     current_command:
       name: "RTD Current Command"
       web_server:
@@ -453,7 +456,7 @@ button:
   - platform: template
     name: "RTD Calibration (25.0°C)"
     web_server:
-      sorting_group_id: rtd_circuit
+      sorting_group_id: rtd_cal
     on_press:
       - lambda: 'id(rtd_sensor).set_calibration_generic(25.0);'
 
@@ -483,7 +486,7 @@ button:
   - platform: template
     name: "RTD Clear Calibration"
     web_server:
-      sorting_group_id: rtd_circuit
+      sorting_group_id: rtd_cal
     on_press:
       - lambda: 'id(rtd_sensor).clear_calibration();'
 
