@@ -151,9 +151,6 @@ class ECSensor : public EZOSensor {
   void dump_config() override;
   void loop() override;
 
-  void add_cell_constant_callback(std::function<void(float)> &&callback) {
-    cell_constant_callback_.add(std::move(callback));
-  }
   void set_temperature_compensation_sensor(sensor::Sensor *temperature_compensation_sensor) {
     this->temperature_compensation_sensor_ = temperature_compensation_sensor;
   }
@@ -181,7 +178,6 @@ class ECSensor : public EZOSensor {
   void parse_temperature_compensation_response_(const std::string &response);
   void parse_reading_csv_(const std::string &response);
 
-  CallbackManager<void(float)> cell_constant_callback_{};
   sensor::Sensor *temperature_compensation_sensor_{nullptr};
   CellConstantSelect *cell_constant_select_{nullptr};
   TDSConversionFactorNumber *tds_conversion_factor_number_{nullptr};
@@ -196,15 +192,6 @@ class RTDSensor : public EZOSensor {
   void update() override;
   void dump_config() override;
 
-  void add_temp_scale_callback(std::function<void(std::string)> &&callback) {
-    temp_scale_callback_.add(std::move(callback));
-  }
-  void add_datalogger_callback(std::function<void(bool, int)> &&callback) {
-    datalogger_callback_.add(std::move(callback));
-  }
-  void add_temperature_change_callback(std::function<void(float)> &&callback) {
-    temperature_change_callback_.add(std::move(callback));
-  }
   void set_datalogger(bool enabled, int interval);
 
  protected:
@@ -213,10 +200,6 @@ class RTDSensor : public EZOSensor {
   void parse_temp_scale_response_(const std::string &response);
   void parse_datalogger_response_(const std::string &response);
   void check_temperature_change_(float new_temp);
-
-  CallbackManager<void(std::string)> temp_scale_callback_{};
-  CallbackManager<void(bool, int)> datalogger_callback_{};
-  CallbackManager<void(float)> temperature_change_callback_{};
 
  public:
   float last_known_temperature_{NAN};
@@ -230,17 +213,12 @@ class ORPSensor : public EZOSensor {
   void update() override;
   void dump_config() override;
 
-  void add_extended_scale_callback(std::function<void(bool)> &&callback) {
-    extended_scale_callback_.add(std::move(callback));
-  }
   void set_extended_scale(bool enabled);
 
  protected:
   void handle_custom_response_(const std::string &response) override;
   void parse_common_calibration_response_(const std::string &response) override;
   void parse_extended_scale_response_(const std::string &response);
-
-  CallbackManager<void(bool)> extended_scale_callback_{};
 };
 
 class TDSConversionFactorNumber : public number::Number, public Component {

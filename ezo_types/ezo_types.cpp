@@ -704,10 +704,9 @@ void RTDSensor::check_temperature_change_(float new_temp) {
     return;
   }
 
-  // If this is the first reading, store it and trigger callback
+  // If this is the first reading, just store it
   if (std::isnan(this->last_known_temperature_)) {
     this->last_known_temperature_ = new_temp;
-    this->temperature_change_callback_.call(new_temp);
     ESP_LOGI(TAG, "[RTD] Initial temperature compensation: %.2f°C", new_temp);
     return;
   }
@@ -716,7 +715,6 @@ void RTDSensor::check_temperature_change_(float new_temp) {
   float temp_diff = std::abs(new_temp - this->last_known_temperature_);
   if (temp_diff >= TEMP_CHANGE_THRESHOLD) {
     this->last_known_temperature_ = new_temp;
-    this->temperature_change_callback_.call(new_temp);
     ESP_LOGI(TAG, "[RTD] Temperature compensation update: %.2f°C (change: %.3f°C)", new_temp, temp_diff);
   }
 }
@@ -767,7 +765,6 @@ void RTDSensor::handle_custom_response_(const std::string &response) {
 }
 
 void RTDSensor::parse_temp_scale_response_(const std::string &response) {
-  this->temp_scale_callback_.call(response);
   ESP_LOGI(TAG, "[RTD] Temperature scale: %s", response.c_str());
 }
 
@@ -777,8 +774,6 @@ void RTDSensor::parse_datalogger_response_(const std::string &response) {
   int interval = parse_number<int>(interval_str).value_or(0);
 
   bool enabled = (interval != 0);
-  this->datalogger_callback_.call(enabled, interval);
-
   ESP_LOGI(TAG, "[RTD] Datalogger %s (interval %d s)", enabled ? "ENABLED" : "DISABLED", interval);
 }
 
@@ -844,8 +839,6 @@ void ORPSensor::parse_extended_scale_response_(const std::string &response) {
   int state = parse_number<int>(state_str).value_or(0);
 
   bool enabled = (state == 1);
-  this->extended_scale_callback_.call(enabled);
-
   ESP_LOGI(TAG, "[ORP] Extended scale %s", enabled ? "ENABLED" : "DISABLED");
 }
 
