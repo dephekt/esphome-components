@@ -55,13 +55,60 @@ web_server:
     - id: orp_circuit
       name: "ORP Circuit"
       sorting_weight: 40
+    - id: diagnostic
+      name: "Diagnostic"
+      sorting_weight: 80
 
 i2c:
   sda: 23
   scl: 22
   scan: true
 
+status_led:
+  pin:
+    number: GPIO13
+    inverted: true
+
+binary_sensor:
+  - platform: status
+    name: "Home Assistant API Status"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: diagnostic
+
 text_sensor:
+  - platform: version
+    name: "ESP Version"
+    hide_timestamp: true
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: diagnostic
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: diagnostic
+    ssid:
+      name: "Connected SSID"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: diagnostic
+    bssid:
+      name: "Connected BSSID"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: diagnostic
+    mac_address:
+      name: "MAC Address"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: diagnostic
+    dns_address:
+      name: "DNS Address"
+      entity_category: diagnostic
+      web_server:
+        sorting_group_id: diagnostic
 
 sensor:
   - platform: ezo_types
@@ -182,6 +229,22 @@ sensor:
       name: "EC Queue Size"
       web_server:
         sorting_group_id: ec_circuit
+    tds:
+      name: "Water TDS"
+      web_server:
+        sorting_group_id: ec_circuit
+    salinity:
+      name: "Water Salinity"
+      web_server:
+        sorting_group_id: ec_circuit
+    relative_density:
+      name: "Water Specific Gravity"
+      web_server:
+        sorting_group_id: ec_circuit
+    tds_conversion_factor:
+      name: "EC TDS Conversion Factor"
+      web_server:
+        sorting_group_id: ec_circuit
 
   - platform: ezo_types
     type: rtd
@@ -224,6 +287,11 @@ sensor:
       name: "RTD Queue Size"
       web_server:
         sorting_group_id: rtd_circuit
+    datalogger:
+      name: "RTD Datalogger"
+      interval: 60
+      web_server:
+        sorting_group_id: rtd_circuit
 
   - platform: ezo_types
     type: orp
@@ -231,7 +299,7 @@ sensor:
     name: "Water ORP"
     address: 98
     update_interval: 5s
-    power_control_switch: orp_enable
+    power_control_switch: aux_enable
     web_server:
       sorting_group_id: orp_circuit
     voltage:
@@ -266,6 +334,23 @@ sensor:
       name: "ORP Queue Size"
       web_server:
         sorting_group_id: orp_circuit
+    extended_scale:
+      name: "ORP Extended Scale"
+      web_server:
+        sorting_group_id: orp_circuit
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: diagnostic
+
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: diagnostic
 
 select:
 
@@ -425,12 +510,13 @@ switch:
       sorting_group_id: ec_circuit
     restore_mode: RESTORE_DEFAULT_ON
 
+  # Slot 4 = AUX (general-purpose port); currently hosts the ORP circuit.
   - platform: gpio
     pin:
       number: GPIO33
       inverted: true
-    name: "Enable ORP Circuit"
-    id: orp_enable
+    name: "Enable AUX Circuit"
+    id: aux_enable
     web_server:
       sorting_group_id: orp_circuit
     restore_mode: RESTORE_DEFAULT_ON
