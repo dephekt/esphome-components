@@ -32,4 +32,8 @@ services:
       - /dev:/dev
     privileged: true
     network_mode: host
-    restart: unless-stopped
+    # No `restart:` policy on purpose: it also applies to `run --rm` containers,
+    # which left exited one-off `run`s alive (each holding an ESPHome API
+    # connection, hitting the API's 5-connection cap) instead of being removed.
+    # For a persistent `up -d` dashboard, add `--restart unless-stopped` to that
+    # container yourself rather than re-adding the policy here.
