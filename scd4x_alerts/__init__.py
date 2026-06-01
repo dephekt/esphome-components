@@ -43,9 +43,12 @@ CONF_VPD_LOW_THRESHOLD_NUMBER = "vpd_low_threshold_number"
 scd4x_alerts_ns = cg.esphome_ns.namespace("scd4x_alerts")
 SCD4xAlerts = scd4x_alerts_ns.class_("SCD4xAlerts", cg.Component)
 
-# Import TemplateNumber from template namespace
+# Import TemplateNumber from template namespace. Declare its Component (and
+# Number) bases so cg.register_component() accepts it — without registering it
+# as a Component, its setup() never runs and the control never publishes its
+# initial value.
 template_ns = cg.esphome_ns.namespace("template_")
-TemplateNumber = template_ns.class_("TemplateNumber")
+TemplateNumber = template_ns.class_("TemplateNumber", number.Number, cg.Component)
 
 
 def binary_sensor_schema(class_name):
@@ -256,6 +259,7 @@ async def to_code(config):
     if CONF_CO2_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_CO2_HIGH_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -271,6 +275,7 @@ async def to_code(config):
     if CONF_CO2_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_CO2_LOW_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -286,6 +291,7 @@ async def to_code(config):
     if CONF_TEMP_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_TEMP_HIGH_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -301,6 +307,7 @@ async def to_code(config):
     if CONF_TEMP_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_TEMP_LOW_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -316,6 +323,7 @@ async def to_code(config):
     if CONF_HUMIDITY_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_HUMIDITY_HIGH_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -331,6 +339,7 @@ async def to_code(config):
     if CONF_HUMIDITY_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_HUMIDITY_LOW_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -346,6 +355,7 @@ async def to_code(config):
     if CONF_VPD_HIGH_THRESHOLD_NUMBER in config:
         num_config = config[CONF_VPD_HIGH_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
@@ -361,6 +371,7 @@ async def to_code(config):
     if CONF_VPD_LOW_THRESHOLD_NUMBER in config:
         num_config = config[CONF_VPD_LOW_THRESHOLD_NUMBER]
         num = cg.new_Pvariable(num_config[CONF_ID])
+        await cg.register_component(num, num_config)
         await number.register_number(
             num,
             num_config,
