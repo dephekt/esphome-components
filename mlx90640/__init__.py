@@ -64,6 +64,7 @@ CONF_WEB_ENABLE = "enable"
 CONF_WEB_PATH = "path"
 CONF_WEB_QUALITY = "quality"
 CONF_WEB_OVERLAY_ENABLED = "overlay_enabled"
+CONF_WEB_HTML_PAGE = "html_page"
 CONF_WEB_SERVER_BASE_ID = "web_server_base_id"
 
 # User control configuration
@@ -167,6 +168,7 @@ CONFIG_SCHEMA = cv.Schema(
                         min=10, max=100
                     ),
                     cv.Optional(CONF_WEB_OVERLAY_ENABLED, default=True): cv.boolean,
+                    cv.Optional(CONF_WEB_HTML_PAGE, default=True): cv.boolean,
                     cv.Optional(CONF_WEB_SERVER_BASE_ID): cv.All(
                         cv.requires_component("web_server_base")
                         if WEB_SERVER_BASE_AVAILABLE
@@ -369,6 +371,7 @@ async def to_code(config):
             cg.add(var.set_web_server_path(web_config[CONF_WEB_PATH]))
             cg.add(var.set_web_server_quality(web_config[CONF_WEB_QUALITY]))
             cg.add(var.set_web_overlay_enabled(web_config[CONF_WEB_OVERLAY_ENABLED]))
+            cg.add(var.set_web_html_page_enabled(web_config[CONF_WEB_HTML_PAGE]))
 
     # Create auto-generated user control entities
     if CONF_UPDATE_INTERVAL_CONTROL in config:

@@ -76,6 +76,7 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   void update_web_overlay_enabled(bool enabled) { web_overlay_enabled_ = enabled; }
   bool is_web_overlay_enabled() const { return web_overlay_enabled_; }
   void set_web_server_base(web_server_base::WebServerBase *base) { base_ = base; }
+  void set_web_html_page_enabled(bool enabled) { web_html_page_enabled_ = enabled; }
 #endif
 
   // Sensor setters
@@ -144,6 +145,8 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
 #ifdef USE_NETWORK
   // Web server thermal image handler
   void handle_thermal_image_request_(AsyncWebServerRequest *request);
+  // Web server thermal viewer page (a small HTML page that renders the JPEG)
+  void handle_thermal_page_request_(AsyncWebServerRequest *request);
 #endif
 
  protected:
@@ -201,6 +204,8 @@ class MLX90640Component : public Component, public i2c::I2CDevice {
   std::string web_server_path_{"/thermal.jpg"};
   int web_server_quality_{85};
   bool web_overlay_enabled_{true};
+  bool web_html_page_enabled_{true};
+  std::string web_html_path_;  // viewer page path, derived from web_server_path_ at setup
   web_server_base::WebServerBase *base_;
 #endif
 
