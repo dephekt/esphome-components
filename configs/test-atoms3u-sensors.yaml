@@ -70,6 +70,10 @@ web_server_base:
 web_server:
   version: 3
   port: 80
+  # Bake a small script into the firmware (served at /0.js) that appends a live,
+  # auto-refreshing thermal image card to the dashboard. The web UI only renders
+  # entity tiles otherwise, so the /thermal.jpg image would not show here.
+  js_include: "./thermal_overlay.js"
   sorting_groups:
     - id: environmental_monitoring
       name: "Environmental Monitoring"
