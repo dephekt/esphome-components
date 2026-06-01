@@ -53,6 +53,9 @@ void MLX90640Component::dump_config() {
 #ifdef USE_NETWORK
   if (web_server_enabled_) {
     ESP_LOGCONFIG(TAG, "  Web Server: %s (160x120, quality=%d)", web_server_path_.c_str(), web_server_quality_);
+    if (web_html_page_enabled_) {
+      ESP_LOGCONFIG(TAG, "  Thermal viewer page: %s", web_html_path_.c_str());
+    }
   }
 #endif
 }
@@ -763,6 +766,22 @@ class MLX90640ThermalImageHandler : public AsyncWebHandler {
   std::string path_;
 };
 
+// Handler for the thermal-viewer HTML page: a tiny self-contained page that
+// renders the JPEG endpoint with an auto-refreshing <img>, so the camera can
+// be watched in a browser without Home Assistant or the ESPHome dashboard.
+class MLX90640ThermalPageHandler : public AsyncWebHandler {
+ public:
+  MLX90640ThermalPageHandler(MLX90640Component *parent, const std::string &path) : parent_(parent), path_(path) {}
+  bool canHandle(AsyncWebServerRequest *request) const override {
+    return request->method() == HTTP_GET && request->url() == this->path_;
+  }
+  void handleRequest(AsyncWebServerRequest *request) override { this->parent_->handle_thermal_page_request_(request); }
+
+ protected:
+  MLX90640Component *parent_;
+  std::string path_;
+};
+
 void MLX90640Component::setup_web_server_() {
   ESP_LOGCONFIG(TAG, "Setting up web server endpoint at %s", web_server_path_.c_str());
 
@@ -780,6 +799,22 @@ void MLX90640Component::setup_web_server_() {
   base_->add_handler(new MLX90640ThermalImageHandler(this, web_server_path_));
 
   ESP_LOGCONFIG(TAG, "Thermal image endpoint registered successfully");
+
+  // Optional HTML viewer page. Derive its path from the image path: swap a
+  // trailing ".jpg" for ".html" (so "/thermal.jpg" -> "/thermal.html"), else
+  // just append ".html".
+  if (web_html_page_enabled_) {
+    web_html_path_ = web_server_path_;
+    const std::string jpg_ext = ".jpg";
+    if (web_html_path_.size() >= jpg_ext.size() &&
+        web_html_path_.compare(web_html_path_.size() - jpg_ext.size(), jpg_ext.size(), jpg_ext) == 0) {
+      web_html_path_.replace(web_html_path_.size() - jpg_ext.size(), jpg_ext.size(), ".html");
+    } else {
+      web_html_path_ += ".html";
+    }
+    base_->add_handler(new MLX90640ThermalPageHandler(this, web_html_path_));
+    ESP_LOGCONFIG(TAG, "Thermal viewer page registered at %s", web_html_path_.c_str());
+  }
 }
 
 void MLX90640Component::handle_thermal_image_request_(AsyncWebServerRequest *request) {
@@ -791,6 +826,36 @@ void MLX90640Component::handle_thermal_image_request_(AsyncWebServerRequest *req
 
   ESP_LOGD(TAG, "Generating JPEG using JPEGENC library");
   generate_jpg_jpegenc_(request, 160, 120, web_server_quality_);
+}
+
+void MLX90640Component::handle_thermal_page_request_(AsyncWebServerRequest *request) {
+  // Refresh the image at roughly the frame cadence; a new fetch re-renders the
+  // latest frame on the device. Floor it so a tiny update_interval can't make
+  // the browser hammer the endpoint.
+  uint32_t refresh_ms = update_interval_ < 250 ? 250 : update_interval_;
+
+  std::string html;
+  html.reserve(1100);
+  html += "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
+  html += "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">";
+  html += "<title>MLX90640 Thermal</title><style>";
+  html += "html,body{margin:0;height:100%;background:#111;color:#ccc;font:14px system-ui,sans-serif}";
+  html += ".wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}";
+  html += "img{max-width:95vw;max-height:85vh;image-rendering:pixelated;border-radius:8px;box-shadow:0 0 20px #0008}";
+  html += ".t{opacity:.7}</style></head><body><div class=\"wrap\">";
+  html += "<img id=\"c\" alt=\"thermal image\"><div class=\"t\">MLX90640 &middot; auto-refresh</div></div><script>";
+  html += "var p=\"";
+  html += web_server_path_;
+  html += "\",ms=";
+  html += std::to_string(refresh_ms);
+  html += ",i=document.getElementById('c');";
+  html += "function r(){i.src=p+'?t='+Date.now()}";
+  html += "i.onload=function(){setTimeout(r,ms)};i.onerror=function(){setTimeout(r,ms*2)};r();";
+  html += "</script></body></html>";
+
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+  response->addHeader("Cache-Control", "no-cache");
+  request->send(response);
 }
 
 void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, int width, int height, int quality) {

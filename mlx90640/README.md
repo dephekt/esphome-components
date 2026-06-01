@@ -73,7 +73,16 @@ mlx90640:
     path: "/thermal.jpg"
     quality: 85                # JPEG quality 10-100
     overlay_enabled: true      # Show ROI and temperature overlays
+    html_page: true            # Also serve a viewer page (default: true)
 ```
+
+With `html_page` enabled, the component also serves a small self-contained
+HTML page that renders the JPEG with an auto-refreshing `<img>`, so you can
+watch the camera in a browser without Home Assistant. Its path is derived from
+`path` by swapping a trailing `.jpg` for `.html` (e.g. `/thermal.jpg` ->
+`/thermal.html`), so with the default config it lives at
+`http://device-ip/thermal.html`. The page refreshes at the component's
+`update_interval`.
 
 ### Region of Interest (ROI)
 
