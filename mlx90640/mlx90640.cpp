@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <memory>
 
 namespace esphome {
 namespace mlx90640 {
@@ -793,7 +794,16 @@ void MLX90640Component::handle_thermal_image_request_(AsyncWebServerRequest *req
 }
 
 void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, int width, int height, int quality) {
-  JPEGENC jpg;
+  // JPEGENC embeds a ~3 KB JPEGE_IMAGE (a 2 KB file buffer plus quant/MCU tables). This handler
+  // runs on the esp_http_server task, whose stack is only ~4 KB, so a stack-allocated JPEGENC
+  // overflows the task stack and resets the device on every /thermal.jpg request. Keep it on the
+  // heap (unique_ptr frees it on every return path). JPEGENCODE is tiny and stays on the stack.
+  std::unique_ptr<JPEGENC> jpg(new (std::nothrow) JPEGENC());
+  if (!jpg) {
+    ESP_LOGE(TAG, "Failed to allocate JPEG encoder");
+    request->send(500, "text/plain", "Memory allocation failed");
+    return;
+  }
   JPEGENCODE jpe;
 
   // Use smaller resolution to avoid heap exhaustion
@@ -834,7 +844,7 @@ void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, in
     return;
   }
 
-  int result = jpg.open(jpg_buffer, 16384);
+  int result = jpg->open(jpg_buffer, 16384);
   if (result != JPEGE_SUCCESS) {
     ESP_LOGE(TAG, "Failed to open JPEG encoder");
     free(jpg_buffer);
@@ -848,7 +858,7 @@ void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, in
                      : (quality >= 50) ? JPEGE_Q_MED
                                        : JPEGE_Q_LOW;
 
-  result = jpg.encodeBegin(&jpe, img_width, img_height, JPEGE_PIXEL_RGB565, JPEGE_SUBSAMPLE_420, jpeg_quality);
+  result = jpg->encodeBegin(&jpe, img_width, img_height, JPEGE_PIXEL_RGB565, JPEGE_SUBSAMPLE_420, jpeg_quality);
   if (result != JPEGE_SUCCESS) {
     ESP_LOGE(TAG, "Failed to begin JPEG encoding");
     free(jpg_buffer);
@@ -856,7 +866,7 @@ void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, in
     return;
   }
 
-  result = jpg.addFrame(&jpe, (uint8_t *) image_data.data(), img_width * sizeof(uint16_t));
+  result = jpg->addFrame(&jpe, (uint8_t *) image_data.data(), img_width * sizeof(uint16_t));
   if (result != JPEGE_SUCCESS) {
     ESP_LOGE(TAG, "Failed to add frame data");
     free(jpg_buffer);
@@ -864,7 +874,7 @@ void MLX90640Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, in
     return;
   }
 
-  int jpeg_size = jpg.close();
+  int jpeg_size = jpg->close();
   ESP_LOGD(TAG, "JPEG created in memory: %d bytes", jpeg_size);
 
   if (jpeg_size > 0) {
