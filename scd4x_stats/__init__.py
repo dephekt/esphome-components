@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 from esphome.components import sensor, time
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_NAME
+from esphome.const import CONF_ID, CONF_NAME, STATE_CLASS_MEASUREMENT
 
 DEPENDENCIES = ["sensor"]
 
@@ -25,6 +25,19 @@ def sensor_schema(class_name):
     )
 
 
+def vpd_sensor_schema(class_name):
+    return sensor.sensor_schema(
+        class_name,
+        unit_of_measurement="kPa",
+        accuracy_decimals=2,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ).extend(
+        {
+            cv.Optional(CONF_NAME): cv.string,
+        }
+    )
+
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(SCD4xStats),
@@ -32,7 +45,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required("temperature_sensor"): cv.use_id(sensor.Sensor),
         cv.Required("humidity_sensor"): cv.use_id(sensor.Sensor),
         cv.Optional("time_id"): cv.use_id(time.RealTimeClock),
-        cv.Optional(CONF_VPD): sensor_schema(sensor.Sensor),
+        cv.Optional(CONF_VPD): vpd_sensor_schema(sensor.Sensor),
         cv.Optional(CONF_DAILY_MAX_CO2): sensor_schema(sensor.Sensor),
         cv.Optional(CONF_DAILY_MIN_TEMP): sensor_schema(sensor.Sensor),
         cv.Optional(CONF_DAILY_MAX_TEMP): sensor_schema(sensor.Sensor),
