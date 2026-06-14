@@ -103,9 +103,10 @@ switch:
     optimistic: true
 ```
 
-A complete, working reference config (all four circuits, every diagnostic, GPIO
-power control, calibration buttons, web-server sorting groups) lives at
-[`configs/atlas-hydro-kit.yaml`](../configs/atlas-hydro-kit.yaml).
+Real controller configs, including the Atlas Hydro Kit firmware that exercises
+all four circuit types, now live in
+[`stackdrift/grow-fleet`](https://codeberg.org/stackdrift/grow-fleet). This
+repository keeps reusable component code, docs, and component-level examples.
 
 ## Configuration variables
 
