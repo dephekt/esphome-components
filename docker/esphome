@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # ESPHome CLI in the local-context dev container, against this repo.
 #
-# WHY THIS WRAPPER: the AtomS3U is USB-attached to THIS machine, but the
-# user's default docker context is remote (media-server -> ssh://containers),
-# where the device does not exist. We force the LOCAL daemon via
-# DOCKER_CONTEXT=default so /dev/ttyACM0 is reachable. Run from anywhere.
+# This repository owns reusable components only. Real grow controller firmware
+# configs live in stackdrift/grow-fleet.
 #
-#   ./docker/esphome compile configs/test-atoms3u-sensors.yaml
-#   ./docker/esphome run     configs/test-atoms3u-sensors.yaml --device /dev/ttyACM0
-#   ./docker/esphome logs    configs/test-atoms3u-sensors.yaml --device /dev/ttyACM0
+# The user's default docker context may point at a remote host. Force the local
+# daemon so scratch configs and component examples can still use local USB,
+# mDNS, and OTA access when needed. Run from anywhere:
+#
+#   ./docker/esphome config  path/to/example.yaml
+#   ./docker/esphome compile path/to/scratch.yaml
+#   ./docker/esphome run     path/to/scratch.yaml --device /dev/ttyACM0
 #
 # Config paths are relative to the repo root (mounted at /config in the
 # container). esptool/other tools: ./docker/esphome ... or override the

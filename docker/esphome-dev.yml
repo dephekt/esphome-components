@@ -1,24 +1,26 @@
 # Local ESPHome dev loop for the esphome-components monorepo.
 #
-# Run from the repo root. The repo is mounted at /config, so dev configs in
-# configs/ can pull the components in-tree via:
+# This repository owns reusable components only. Real grow controller firmware
+# configs live in stackdrift/grow-fleet.
+#
+# Run from the repo root. The repo is mounted at /config, so scratch configs or
+# component examples can pull the components in-tree via:
 #     external_components:
 #       - source: { type: local, path: /config }
 #         components: [mlx90640, scd4x_alerts, scd4x_stats, ...]
 #
 # One-off CLI (ephemeral container, auto-removed):
-#   docker compose -f docker/esphome-dev.yml run --rm esphome compile configs/test-atoms3u-sensors.yaml
-#   docker compose -f docker/esphome-dev.yml run --rm esphome run     configs/test-atoms3u-sensors.yaml --device /dev/ttyACM0
-#   docker compose -f docker/esphome-dev.yml run --rm esphome logs    configs/test-atoms3u-sensors.yaml --device /dev/ttyACM0
+#   docker compose -f docker/esphome-dev.yml run --rm esphome config  path/to/example.yaml
+#   docker compose -f docker/esphome-dev.yml run --rm esphome compile path/to/scratch.yaml
+#   docker compose -f docker/esphome-dev.yml run --rm esphome run     path/to/scratch.yaml --device /dev/ttyACM0
 #
 # Or the web dashboard (http://localhost:6052):
 #   docker compose -f docker/esphome-dev.yml up -d
 #
-# USB notes: the AtomS3U (ESP32-S3 native USB-Serial-JTAG) appears as
-# /dev/ttyACM0 and RE-ENUMERATES on reset while flashing. `privileged: true`
-# gives the container live host /dev access so it follows the re-enumeration;
-# a static `devices:` map would not. `network_mode: host` is for mDNS
-# discovery, OTA, and network `logs`.
+# USB notes: native USB devices can re-enumerate while flashing. `privileged:
+# true` plus the host /dev bind lets the container follow those changes; a
+# static `devices:` map would not. `network_mode: host` is for mDNS discovery,
+# OTA, and network `logs`.
 services:
   esphome:
     container_name: esphome-dev
@@ -26,8 +28,8 @@ services:
     volumes:
       - ../:/config
       - /etc/localtime:/etc/localtime:ro
-      # Bind the whole host /dev so the container sees the serial port AND
-      # follows the ESP32-S3 native-USB re-enumeration during flashing.
+      # Bind the whole host /dev so the container sees local serial ports and
+      # follows native-USB re-enumeration during flashing.
       # (On this host, `privileged` alone did not expose /dev/ttyACM0.)
       - /dev:/dev
     privileged: true
