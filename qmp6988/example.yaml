@@ -1,0 +1,40 @@
+# Example usage of the hardened QMP6988 barometric pressure component.
+# Drop-in replacement for ESPHome's built-in qmp6988 — same schema, more reliable
+# init + a runtime self-heal/plausibility guard. See README.md for why.
+
+esphome:
+  name: pressure-monitor
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+logger:
+
+# Required I2C bus for the QMP6988.
+i2c:
+  sda: 2
+  scl: 1
+  frequency: 400kHz
+  scan: true
+
+# External components live at the repository root, so path must be ".".
+external_components:
+  - source:
+      type: git
+      url: https://github.com/dephekt/esphome-components
+      path: .
+    components: [qmp6988]
+
+sensor:
+  - platform: qmp6988
+    address: 0x70          # default (SDO high); use 0x56 for SDO low
+    update_interval: 60s
+    iir_filter: 2x         # OFF, 2x, 4x, 8x, 16x, 32x
+    temperature:
+      name: "BPS Temperature"
+      # oversampling: 8x   # NONE, 1x .. 64x (default 8x)
+    pressure:
+      name: "Barometric Pressure"
+      # oversampling: 8x
