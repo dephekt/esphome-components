@@ -20,26 +20,14 @@ static const uint8_t QMP6988_CALIBRATION_DATA_START = 0xA0; /* QMP6988 compensat
 static const uint8_t QMP6988_CALIBRATION_DATA_LENGTH = 25;
 
 /* power mode */
-static const uint8_t QMP6988_SLEEP_MODE = 0x00;
-static const uint8_t QMP6988_FORCED_MODE = 0x01;
 static const uint8_t QMP6988_NORMAL_MODE = 0x03;
 
-static const uint8_t QMP6988_CTRLMEAS_REG_MODE_POS = 0;
-static const uint8_t QMP6988_CTRLMEAS_REG_MODE_MSK = 0x03;
-static const uint8_t QMP6988_CTRLMEAS_REG_MODE_LEN = 2;
-
 static const uint8_t QMP6988_CTRLMEAS_REG_OSRST_POS = 5;
-static const uint8_t QMP6988_CTRLMEAS_REG_OSRST_MSK = 0xE0;
-static const uint8_t QMP6988_CTRLMEAS_REG_OSRST_LEN = 3;
 
 static const uint8_t QMP6988_CTRLMEAS_REG_OSRSP_POS = 2;
-static const uint8_t QMP6988_CTRLMEAS_REG_OSRSP_MSK = 0x1C;
-static const uint8_t QMP6988_CTRLMEAS_REG_OSRSP_LEN = 3;
 
 static const uint8_t QMP6988_CONFIG_REG = 0xF1; /*IIR filter co-efficient setting Register*/
-static const uint8_t QMP6988_CONFIG_REG_FILTER_POS = 0;
 static const uint8_t QMP6988_CONFIG_REG_FILTER_MSK = 0x07;
-static const uint8_t QMP6988_CONFIG_REG_FILTER_LEN = 3;
 
 static const uint32_t SUBTRACTOR = 8388608;
 
@@ -236,53 +224,11 @@ void QMP6988Component::software_reset_() {
   delay(10);
 }
 
-void QMP6988Component::set_power_mode_(uint8_t power_mode) {
-  uint8_t data;
-
-  ESP_LOGD(TAG, "Setting Power mode to: %d", power_mode);
-
-  qmp6988_data_.power_mode = power_mode;
-  this->read_register(QMP6988_CTRLMEAS_REG, &data, 1);
-  data = data & 0xfc;
-  if (power_mode == QMP6988_SLEEP_MODE) {
-    data |= 0x00;
-  } else if (power_mode == QMP6988_FORCED_MODE) {
-    data |= 0x01;
-  } else if (power_mode == QMP6988_NORMAL_MODE) {
-    data |= 0x03;
-  }
-  this->write_byte(QMP6988_CTRLMEAS_REG, data);
-
-  ESP_LOGD(TAG, "Set Power mode 0xf4=0x%x \r\n", data);
-
-  delay(10);
-}
-
 void QMP6988Component::write_filter_(QMP6988IIRFilter filter) {
   uint8_t data;
 
   data = (filter & QMP6988_CONFIG_REG_FILTER_MSK);
   this->write_byte(QMP6988_CONFIG_REG, data);
-  delay(10);
-}
-
-void QMP6988Component::write_oversampling_pressure_(QMP6988Oversampling oversampling_p) {
-  uint8_t data;
-
-  this->read_register(QMP6988_CTRLMEAS_REG, &data, 1);
-  data &= 0xe3;
-  data |= (oversampling_p << 2);
-  this->write_byte(QMP6988_CTRLMEAS_REG, data);
-  delay(10);
-}
-
-void QMP6988Component::write_oversampling_temperature_(QMP6988Oversampling oversampling_t) {
-  uint8_t data;
-
-  this->read_register(QMP6988_CTRLMEAS_REG, &data, 1);
-  data &= 0x1f;
-  data |= (oversampling_t << 5);
-  this->write_byte(QMP6988_CTRLMEAS_REG, data);
   delay(10);
 }
 
@@ -302,7 +248,6 @@ bool QMP6988Component::ensure_configured_() {
     delay(10);
     uint8_t read_back = 0;
     if (this->read_register(QMP6988_CTRLMEAS_REG, &read_back, 1) == i2c::ERROR_OK && read_back == expected) {
-      this->qmp6988_data_.power_mode = QMP6988_NORMAL_MODE;
       return true;
     }
     ESP_LOGW(TAG, "CTRLMEAS not confirmed (wrote 0x%02X, read 0x%02X), attempt %u/3", expected, read_back, attempt);
@@ -325,12 +270,6 @@ bool QMP6988Component::values_plausible_(float temperature_c, float pressure_hpa
   return !std::isnan(temperature_c) && !std::isnan(pressure_hpa) && pressure_hpa >= QMP6988_PRESSURE_MIN_HPA &&
          pressure_hpa <= QMP6988_PRESSURE_MAX_HPA && temperature_c >= QMP6988_TEMPERATURE_MIN_C &&
          temperature_c <= QMP6988_TEMPERATURE_MAX_C;
-}
-
-void QMP6988Component::calculate_altitude_(float pressure, float temp) {
-  float altitude;
-  altitude = (pow((101325 / pressure), 1 / 5.257) - 1) * (temp + 273.15) / 0.0065;
-  this->qmp6988_data_.altitude = altitude;
 }
 
 bool QMP6988Component::calculate_pressure_() {
@@ -405,7 +344,9 @@ void QMP6988Component::update() {
   if (!read_ok || !values_plausible_(temperature, pressure_hectopascals)) {
     ESP_LOGW(TAG, "Implausible reading (Temperature=%.2f°C, Pressure=%.2fhPa); re-initializing sensor", temperature,
              pressure_hectopascals);
-    this->reconfigure_();
+    if (!this->reconfigure_()) {
+      ESP_LOGW(TAG, "Re-initialization failed; will report unavailable this cycle");
+    }
     delay(100);  // allow at least one NORMAL-mode conversion to complete before re-reading
     read_ok = this->calculate_pressure_();
     pressure_hectopascals = this->qmp6988_data_.pressure / 100.0f;
