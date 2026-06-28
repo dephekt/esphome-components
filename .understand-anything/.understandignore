@@ -1,0 +1,24 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Use ! prefix to force-include something excluded by defaults.
+#
+# Built-in defaults (always excluded unless negated):
+#   node_modules/, .git/, dist/, build/, obj/, *.lock, *.min.js, etc.
+
+# --- ESPHome / PlatformIO build cache (generated, ~10k files) ---
+.esphome/
+**/.esphome/
+
+# --- Secrets (never analyze) ---
+secrets.yaml
+**/secrets.yaml
+
+# --- Agent / MCP scratch artifacts (not project code) ---
+.playwright-mcp/
+.claude/
+.codex/
+.agents/
+
+# --- Test file patterns (none present, kept commented) ---
+# *.test.*
+# *.spec.*

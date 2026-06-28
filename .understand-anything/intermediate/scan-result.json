@@ -1,0 +1,381 @@
+{
+  "name": "esphome-components",
+  "description": "ESPHome external-components monorepo for grow and environmental monitoring hardware, providing reusable custom components (MLX90640 thermal camera, SCD4x CO2 statistics and alerting, Atlas Scientific EZO circuits, and M5Stack CoreS3 board support) implemented as Python codegen plus C++. The repository owns components only; real device firmware configs live elsewhere (stackdrift/grow-fleet).",
+  "languages": [
+    "c",
+    "cpp",
+    "markdown",
+    "python",
+    "yaml"
+  ],
+  "frameworks": [
+    "ESPHome",
+    "Docker Compose"
+  ],
+  "files": [
+    {
+      "path": "board_m5cores3/__init__.py",
+      "language": "python",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "board_m5cores3/board_m5cores3.cpp",
+      "language": "cpp",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "board_m5cores3/board_m5cores3.h",
+      "language": "c",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "docker/esphome",
+      "language": "unknown",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "docker/esphome-dev.yml",
+      "language": "yaml",
+      "sizeLines": 41,
+      "fileCategory": "config"
+    },
+    {
+      "path": "ezo_types/__init__.py",
+      "language": "python",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/ezo_types.cpp",
+      "language": "cpp",
+      "sizeLines": 1027,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/ezo_types.h",
+      "language": "c",
+      "sizeLines": 238,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/number.py",
+      "language": "python",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/README.md",
+      "language": "markdown",
+      "sizeLines": 244,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "ezo_types/select.cpp",
+      "language": "cpp",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/select.h",
+      "language": "c",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/select.py",
+      "language": "python",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/sensor.py",
+      "language": "python",
+      "sizeLines": 467,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/switch.cpp",
+      "language": "cpp",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/switch.h",
+      "language": "c",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "ezo_types/switch.py",
+      "language": "python",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "grow_env_monitor/__init__.py",
+      "language": "python",
+      "sizeLines": 130,
+      "fileCategory": "code"
+    },
+    {
+      "path": "grow_env_monitor/grow_env_monitor.cpp",
+      "language": "cpp",
+      "sizeLines": 871,
+      "fileCategory": "code"
+    },
+    {
+      "path": "grow_env_monitor/grow_env_monitor.h",
+      "language": "c",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_display/__init__.py",
+      "language": "python",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_display/m5cores3_display.cpp",
+      "language": "cpp",
+      "sizeLines": 286,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_display/m5cores3_display.h",
+      "language": "c",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_power/__init__.py",
+      "language": "python",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_power/m5cores3_power.cpp",
+      "language": "cpp",
+      "sizeLines": 122,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_power/m5cores3_power.h",
+      "language": "c",
+      "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_touch/__init__.py",
+      "language": "python",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_touch/m5cores3_touch.cpp",
+      "language": "cpp",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "m5cores3_touch/m5cores3_touch.h",
+      "language": "c",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/__init__.py",
+      "language": "python",
+      "sizeLines": 649,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/example.yaml",
+      "language": "yaml",
+      "sizeLines": 138,
+      "fileCategory": "config"
+    },
+    {
+      "path": "mlx90640/MLX90640_API.cpp",
+      "language": "cpp",
+      "sizeLines": 1244,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/MLX90640_API.h",
+      "language": "c",
+      "sizeLines": 129,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/MLX90640_I2C_Driver.cpp",
+      "language": "cpp",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/MLX90640_I2C_Driver.h",
+      "language": "c",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/mlx90640.cpp",
+      "language": "cpp",
+      "sizeLines": 1538,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/mlx90640.h",
+      "language": "c",
+      "sizeLines": 351,
+      "fileCategory": "code"
+    },
+    {
+      "path": "mlx90640/README.md",
+      "language": "markdown",
+      "sizeLines": 180,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scd4x_alerts/__init__.py",
+      "language": "python",
+      "sizeLines": 385,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scd4x_alerts/README.md",
+      "language": "markdown",
+      "sizeLines": 472,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scd4x_alerts/scd4x_alerts.cpp",
+      "language": "cpp",
+      "sizeLines": 184,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scd4x_alerts/scd4x_alerts.h",
+      "language": "c",
+      "sizeLines": 129,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scd4x_stats/__init__.py",
+      "language": "python",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scd4x_stats/README.md",
+      "language": "markdown",
+      "sizeLines": 168,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scd4x_stats/scd4x_stats.cpp",
+      "language": "cpp",
+      "sizeLines": 183,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scd4x_stats/scd4x_stats.h",
+      "language": "c",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 46,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    "board_m5cores3/__init__.py": [],
+    "board_m5cores3/board_m5cores3.cpp": [
+      "board_m5cores3/board_m5cores3.h"
+    ],
+    "board_m5cores3/board_m5cores3.h": [],
+    "docker/esphome": [],
+    "docker/esphome-dev.yml": [],
+    "ezo_types/__init__.py": [],
+    "ezo_types/ezo_types.cpp": [
+      "ezo_types/ezo_types.h",
+      "ezo_types/select.h",
+      "ezo_types/switch.h"
+    ],
+    "ezo_types/ezo_types.h": [],
+    "ezo_types/number.py": [],
+    "ezo_types/README.md": [],
+    "ezo_types/select.cpp": [
+      "ezo_types/ezo_types.h",
+      "ezo_types/select.h"
+    ],
+    "ezo_types/select.h": [],
+    "ezo_types/select.py": [],
+    "ezo_types/sensor.py": [
+      "ezo_types/select.py",
+      "ezo_types/switch.py"
+    ],
+    "ezo_types/switch.cpp": [
+      "ezo_types/ezo_types.h",
+      "ezo_types/switch.h"
+    ],
+    "ezo_types/switch.h": [],
+    "ezo_types/switch.py": [],
+    "grow_env_monitor/__init__.py": [],
+    "grow_env_monitor/grow_env_monitor.cpp": [
+      "grow_env_monitor/grow_env_monitor.h"
+    ],
+    "grow_env_monitor/grow_env_monitor.h": [],
+    "m5cores3_display/__init__.py": [],
+    "m5cores3_display/m5cores3_display.cpp": [
+      "m5cores3_display/m5cores3_display.h"
+    ],
+    "m5cores3_display/m5cores3_display.h": [],
+    "m5cores3_power/__init__.py": [],
+    "m5cores3_power/m5cores3_power.cpp": [
+      "m5cores3_power/m5cores3_power.h"
+    ],
+    "m5cores3_power/m5cores3_power.h": [],
+    "m5cores3_touch/__init__.py": [],
+    "m5cores3_touch/m5cores3_touch.cpp": [
+      "m5cores3_touch/m5cores3_touch.h"
+    ],
+    "m5cores3_touch/m5cores3_touch.h": [],
+    "mlx90640/__init__.py": [],
+    "mlx90640/example.yaml": [],
+    "mlx90640/MLX90640_API.cpp": [
+      "mlx90640/MLX90640_API.h",
+      "mlx90640/MLX90640_I2C_Driver.h"
+    ],
+    "mlx90640/MLX90640_API.h": [],
+    "mlx90640/MLX90640_I2C_Driver.cpp": [
+      "mlx90640/MLX90640_I2C_Driver.h"
+    ],
+    "mlx90640/MLX90640_I2C_Driver.h": [],
+    "mlx90640/mlx90640.cpp": [
+      "mlx90640/mlx90640.h"
+    ],
+    "mlx90640/mlx90640.h": [
+      "mlx90640/MLX90640_API.h",
+      "mlx90640/MLX90640_I2C_Driver.h"
+    ],
+    "mlx90640/README.md": [],
+    "scd4x_alerts/__init__.py": [],
+    "scd4x_alerts/README.md": [],
+    "scd4x_alerts/scd4x_alerts.cpp": [
+      "scd4x_alerts/scd4x_alerts.h"
+    ],
+    "scd4x_alerts/scd4x_alerts.h": [],
+    "scd4x_stats/__init__.py": [],
+    "scd4x_stats/README.md": [],
+    "scd4x_stats/scd4x_stats.cpp": [
+      "scd4x_stats/scd4x_stats.h"
+    ],
+    "scd4x_stats/scd4x_stats.h": []
+  }
+}

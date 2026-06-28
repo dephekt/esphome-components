@@ -1,0 +1,3 @@
+# Transient scratch from /understand runs — never commit these.
+.trash-*/
+tmp/
