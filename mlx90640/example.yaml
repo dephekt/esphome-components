@@ -16,13 +16,13 @@ i2c:
   scl: 22
   scan: true
 
-# External components - users can reference this component
+# External components - users can reference this component.
+# Components live at the repository root, so path must point there (path: .).
 external_components:
   - source:
       type: git
-      url: https://github.com/terpasaurus-midwest/esphome-fork
-      ref: m5cores3  # must use this branch even if you don't have an S3
-      path: my_components
+      url: https://github.com/dephekt/esphome-components
+      path: .
     components: [mlx90640]
 
 # MLX90640 thermal camera, all options are under this
