@@ -222,59 +222,65 @@ int32_t QMP6988Component::get_compensated_pressure_(qmp6988_ik_data_t *ik, int32
   return ret;
 }
 
-void QMP6988Component::software_reset_() {
-  // write_byte() returns a bool (true on success), not an i2c::ErrorCode. The stock driver
-  // compared it against ERROR_OK and therefore logged a spurious "failed" error on every
-  // successful reset; handle the boolean correctly here.
-  if (!this->write_byte(QMP6988_RESET_REG, 0xe6)) {
+uint8_t QMP6988Component::target_ctrlmeas_() const {
+  return (uint8_t) ((this->temperature_oversampling_ << QMP6988_CTRLMEAS_REG_OSRST_POS) |
+                    (this->pressure_oversampling_ << QMP6988_CTRLMEAS_REG_OSRSP_POS) | QMP6988_NORMAL_MODE);
+}
+
+void QMP6988Component::begin_recovery_() {
+  if (this->recovering_)
+    return;  // a recovery sequence is already in flight
+  this->recovering_ = true;
+  // Issue software reset; let the device reload calibration from OTP before clearing it.
+  if (!this->write_byte(QMP6988_RESET_REG, 0xe6))
     ESP_LOGD(TAG, "Software reset (0xe6) not acknowledged; continuing");
-  }
-  delay(20);  // let the device complete the reset and reload calibration from OTP
+  this->set_timeout("qmp6988_recover", 20, [this]() { this->recovery_clear_reset_(); });
+}
 
+void QMP6988Component::recovery_clear_reset_() {
   this->write_byte(QMP6988_RESET_REG, 0x00);
-  delay(10);
+  this->set_timeout("qmp6988_recover", 10, [this]() { this->recovery_configure_(); });
 }
 
-void QMP6988Component::write_filter_(QMP6988IIRFilter filter) {
-  uint8_t data;
-
-  data = (filter & QMP6988_CONFIG_REG_FILTER_MSK);
-  this->write_byte(QMP6988_CONFIG_REG, data);
-  delay(10);
-}
-
-bool QMP6988Component::ensure_configured_() {
-  this->write_filter_(this->iir_filter_);
-
-  // Combine power mode + both oversampling fields into a single CTRLMEAS (0xF4) write, then
-  // read it back to confirm it stuck. The stock driver issued three separate read-modify-write
-  // transactions and never verified them; on this hardware an unconfirmed write can silently
-  // leave the device in sleep mode, so its data registers never update and compensation yields
-  // a fixed garbage value.
-  const uint8_t expected = (uint8_t) ((this->temperature_oversampling_ << QMP6988_CTRLMEAS_REG_OSRST_POS) |
-                                      (this->pressure_oversampling_ << QMP6988_CTRLMEAS_REG_OSRSP_POS) |
-                                      QMP6988_NORMAL_MODE);
-  for (uint8_t attempt = 1; attempt <= 3; attempt++) {
-    this->write_byte(QMP6988_CTRLMEAS_REG, expected);
-    delay(10);
-    uint8_t read_back = 0;
-    if (this->read_register(QMP6988_CTRLMEAS_REG, &read_back, 1) == i2c::ERROR_OK && read_back == expected) {
-      return true;
-    }
-    ESP_LOGW(TAG, "CTRLMEAS not confirmed (wrote 0x%02X, read 0x%02X), attempt %u/3", expected, read_back, attempt);
-    delay(20);
-  }
-  return false;
-}
-
-bool QMP6988Component::reconfigure_() {
-  this->software_reset_();
-  bool calibrated = this->get_calibration_data_();
-  if (!calibrated) {
+void QMP6988Component::recovery_configure_() {
+  this->recovery_calibrated_ = this->get_calibration_data_();
+  if (!this->recovery_calibrated_)
     ESP_LOGW(TAG, "Reading calibration data failed");
+  this->write_byte(QMP6988_CONFIG_REG, this->iir_filter_ & QMP6988_CONFIG_REG_FILTER_MSK);
+  this->configure_attempts_ = 0;
+  this->set_timeout("qmp6988_recover", 10, [this]() { this->recovery_write_ctrlmeas_(); });
+}
+
+void QMP6988Component::recovery_write_ctrlmeas_() {
+  // Power mode + both oversampling fields in one CTRLMEAS transaction (verified next step).
+  this->configure_attempts_++;
+  this->write_byte(QMP6988_CTRLMEAS_REG, this->target_ctrlmeas_());
+  this->set_timeout("qmp6988_recover", 10, [this]() { this->recovery_verify_ctrlmeas_(); });
+}
+
+void QMP6988Component::recovery_verify_ctrlmeas_() {
+  const uint8_t expected = this->target_ctrlmeas_();
+  uint8_t read_back = 0;
+  if (this->read_register(QMP6988_CTRLMEAS_REG, &read_back, 1) == i2c::ERROR_OK && read_back == expected) {
+    this->finish_recovery_(true);
+    return;
   }
-  bool configured = this->ensure_configured_();
-  return calibrated && configured;
+  ESP_LOGW(TAG, "CTRLMEAS not confirmed (wrote 0x%02X, read 0x%02X), attempt %u/3", expected, read_back,
+           this->configure_attempts_);
+  if (this->configure_attempts_ < 3) {
+    this->set_timeout("qmp6988_recover", 20, [this]() { this->recovery_write_ctrlmeas_(); });
+  } else {
+    this->finish_recovery_(false);
+  }
+}
+
+void QMP6988Component::finish_recovery_(bool configured) {
+  this->recovering_ = false;
+  if (configured && this->recovery_calibrated_) {
+    ESP_LOGD(TAG, "Sensor re-initialized");
+  } else {
+    ESP_LOGW(TAG, "Re-initialization incomplete; will retry on next update");
+  }
 }
 
 bool QMP6988Component::values_plausible_(float temperature_c, float pressure_hpa) {
@@ -324,11 +330,9 @@ void QMP6988Component::setup() {
     return;
   }
 
-  if (!this->reconfigure_()) {
-    // The device is present (chip ID verified) but configuration could not be confirmed. Do not
-    // mark it failed: update() re-initializes and guards its output until the sensor recovers.
-    ESP_LOGW(TAG, "Initial configuration could not be confirmed; will retry during updates");
-  }
+  // Non-blocking init; the scheduler completes it within ~60 ms after setup() returns.
+  // update() guards its output (NaN) until the device is producing valid data.
+  this->begin_recovery_();
 }
 
 void QMP6988Component::dump_config() {
@@ -350,28 +354,17 @@ void QMP6988Component::update() {
   float pressure_hectopascals = this->qmp6988_data_.pressure / 100.0f;
   float temperature = this->qmp6988_data_.temperature;
 
-  // Self-heal: if the read failed or the values are physically impossible, the sensor most likely
-  // dropped out of measuring mode. Re-initialize and try once more before giving up this cycle.
-  if (!read_ok || !values_plausible_(temperature, pressure_hectopascals)) {
-    ESP_LOGW(TAG, "Implausible reading (Temperature=%.2f°C, Pressure=%.2fhPa); re-initializing sensor", temperature,
-             pressure_hectopascals);
-    if (!this->reconfigure_()) {
-      ESP_LOGW(TAG, "Re-initialization failed; will report unavailable this cycle");
-    }
-    delay(100);  // allow at least one NORMAL-mode conversion to complete before re-reading
-    read_ok = this->calculate_pressure_();
-    pressure_hectopascals = this->qmp6988_data_.pressure / 100.0f;
-    temperature = this->qmp6988_data_.temperature;
-  }
-
   if (read_ok && values_plausible_(temperature, pressure_hectopascals)) {
     ESP_LOGD(TAG, "Temperature=%.2f°C, Pressure=%.2fhPa", temperature, pressure_hectopascals);
   } else {
-    // Publish NaN so consumers (MQTT, the web server, grow-app) show the sensor as unavailable
-    // rather than propagating garbage.
-    ESP_LOGW(TAG, "QMP6988 not producing valid data; publishing as unavailable");
+    // Read failed or values are physically impossible — the sensor most likely dropped out of
+    // measuring mode. Publish NaN this cycle and kick off a non-blocking re-init; the next
+    // update() reads the recovered sensor.
+    ESP_LOGW(TAG, "Implausible reading (Temperature=%.2f°C, Pressure=%.2fhPa); re-initializing sensor", temperature,
+             pressure_hectopascals);
     temperature = NAN;
     pressure_hectopascals = NAN;
+    this->begin_recovery_();
   }
 
   if (this->temperature_sensor_ != nullptr)

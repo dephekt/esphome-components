@@ -95,15 +95,22 @@ class QMP6988Component : public PollingComponent, public i2c::I2CDevice {
   QMP6988Oversampling pressure_oversampling_{QMP6988_OVERSAMPLING_8X};
   QMP6988IIRFilter iir_filter_{QMP6988_IIR_FILTER_OFF};
 
-  void software_reset_();
+  bool recovering_{false};           // a recovery sequence is in flight
+  bool recovery_calibrated_{false};  // calibration result, carried to finish_recovery_
+  uint8_t configure_attempts_{0};    // CTRLMEAS retry counter
+
   bool get_calibration_data_();
   bool device_check_();
-  void write_filter_(QMP6988IIRFilter filter);
-  // Write power mode + oversampling in one CTRLMEAS transaction and verify it stuck
-  // (with retries). Returns true once the device is confirmed in NORMAL measuring mode.
-  bool ensure_configured_();
-  // Full (re)initialization: soft reset, reload calibration, and ensure measuring mode.
-  bool reconfigure_();
+  // Non-blocking (re)initialization: software reset, reload calibration, and program
+  // CTRLMEAS, sequenced over the scheduler so no step blocks the main loop. Used by
+  // setup() and update()'s self-heal. No-op while a sequence is already in flight.
+  void begin_recovery_();
+  void recovery_clear_reset_();
+  void recovery_configure_();
+  void recovery_write_ctrlmeas_();
+  void recovery_verify_ctrlmeas_();
+  void finish_recovery_(bool configured);
+  uint8_t target_ctrlmeas_() const;
   // Physical-plausibility gate used to reject garbage from a non-converting sensor.
   static bool values_plausible_(float temperature_c, float pressure_hpa);
   // Returns false on an I2C read error; on success the compensated values are stored.
