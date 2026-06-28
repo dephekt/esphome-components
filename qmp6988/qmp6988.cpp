@@ -1,3 +1,14 @@
+// QMP6988 barometric pressure sensor component for ESPHome.
+//
+// Derived from ESPHome's built-in `qmp6988` component, with hardened
+// initialization, runtime self-heal, and an output plausibility guard added.
+//
+// Per the ESPHome License, the C++ sources (.c/.cpp/.h/.hpp/.tcc/.ino) of this
+// component are licensed under the GNU General Public License v3. See the
+// LICENSE file in this directory for the full text.
+//
+// Copyright (c) 2019 ESPHome
+
 #include "qmp6988.h"
 
 #include <cinttypes>
