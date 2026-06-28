@@ -18,6 +18,7 @@ adopted à la carte.
 | **`scd4x_stats`** | Derived sensors for an SCD4x CO₂ sensor: VPD (vapor-pressure deficit), daily min/max, and moving averages, with a midnight reset. | [README](scd4x_stats/README.md) |
 | **`scd4x_alerts`** | Debounced threshold alerting over CO₂, temperature, humidity, and VPD. Emits `binary_sensor` alert outputs with user-adjustable `number` thresholds and configurable on/off delays. | [README](scd4x_alerts/README.md) |
 | **`ezo_types`** | Typed support for Atlas Scientific **EZO** circuits (pH, EC, RTD, ORP). A multi-platform component (`sensor`/`select`/`number`/`switch`) with diagnostic sensors, calibration controls, and temperature-compensated reads. | [README](ezo_types/README.md) |
+| **`qmp6988`** | Hardened drop-in replacement for ESPHome's built-in QMP6988 barometric pressure sensor: verifies the device entered measuring mode (with retries), self-heals at runtime if it stops converting, and guards against publishing physically impossible values. Same schema as upstream. | [README](qmp6988/README.md) · [example](qmp6988/example.yaml) |
 | **`board_m5cores3`** | M5Stack CoreS3 board bring-up: powers the AXP2101 PMIC, configures the AW9523 GPIO expander, and enables the display backlight — prerequisites before anything renders. | — |
 | **`m5cores3_power`** | Polls the AXP2101 PMIC for battery / power state. | — |
 | **`m5cores3_touch`** | Drives the CoreS3 touchscreen and fires touch/release automation triggers. | — |
@@ -122,4 +123,8 @@ docker compose -f docker/esphome-dev.yml up -d          # http://localhost:6052
 
 Vendored Melexis MLX90640 driver code under `mlx90640/` (`MLX90640_API.*`,
 `MLX90640_I2C_Driver.*`) is third-party upstream code and retains its original
+license.
+
+The `qmp6988/` component is derived from ESPHome's built-in `qmp6988` component
+(hardened init + runtime self-heal/plausibility guard) and retains its upstream
 license.
