@@ -46,11 +46,6 @@ using qmp6988_cali_data_t = struct Qmp6988CaliData {
   int16_t COE_bp3;
 };
 
-using qmp6988_fk_data_t = struct Qmp6988FkData {
-  float a0, b00;
-  float a1, a2, bt1, bt2, bp1, b11, bp2, b12, b21, bp3;
-};
-
 using qmp6988_ik_data_t = struct Qmp6988IkData {
   int32_t a0, b00;
   int32_t a1, a2;
@@ -59,10 +54,8 @@ using qmp6988_ik_data_t = struct Qmp6988IkData {
 
 using qmp6988_data_t = struct Qmp6988Data {
   uint8_t chip_id;
-  uint8_t power_mode;
   float temperature;
   float pressure;
-  float altitude;
   qmp6988_cali_data_t qmp6988_cali;
   qmp6988_ik_data_t ik;
 };
@@ -87,16 +80,13 @@ class QMP6988Component : public PollingComponent, public i2c::I2CDevice {
   sensor::Sensor *temperature_sensor_{nullptr};
   sensor::Sensor *pressure_sensor_{nullptr};
 
-  QMP6988Oversampling temperature_oversampling_{QMP6988_OVERSAMPLING_16X};
-  QMP6988Oversampling pressure_oversampling_{QMP6988_OVERSAMPLING_16X};
+  QMP6988Oversampling temperature_oversampling_{QMP6988_OVERSAMPLING_8X};
+  QMP6988Oversampling pressure_oversampling_{QMP6988_OVERSAMPLING_8X};
   QMP6988IIRFilter iir_filter_{QMP6988_IIR_FILTER_OFF};
 
   void software_reset_();
   bool get_calibration_data_();
   bool device_check_();
-  void set_power_mode_(uint8_t power_mode);
-  void write_oversampling_temperature_(QMP6988Oversampling oversampling_t);
-  void write_oversampling_pressure_(QMP6988Oversampling oversampling_p);
   void write_filter_(QMP6988IIRFilter filter);
   // Write power mode + oversampling in one CTRLMEAS transaction and verify it stuck
   // (with retries). Returns true once the device is confirmed in NORMAL measuring mode.
@@ -107,7 +97,6 @@ class QMP6988Component : public PollingComponent, public i2c::I2CDevice {
   static bool values_plausible_(float temperature_c, float pressure_hpa);
   // Returns false on an I2C read error; on success the compensated values are stored.
   bool calculate_pressure_();
-  void calculate_altitude_(float pressure, float temp);
 
   int32_t get_compensated_pressure_(qmp6988_ik_data_t *ik, int32_t dp, int16_t tx);
   int16_t get_compensated_temperature_(qmp6988_ik_data_t *ik, int32_t dt);
