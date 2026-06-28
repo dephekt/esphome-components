@@ -1,0 +1,4663 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "esphome-components",
+    "languages": [
+      "c",
+      "cpp",
+      "markdown",
+      "python",
+      "yaml"
+    ],
+    "frameworks": [
+      "ESPHome",
+      "Docker Compose"
+    ],
+    "description": "ESPHome external-components monorepo for grow and environmental monitoring hardware, providing reusable custom components (MLX90640 thermal camera, SCD4x CO2 statistics and alerting, Atlas Scientific EZO circuits, and M5Stack CoreS3 board support) implemented as Python codegen plus C++. The repository owns components only; real device firmware configs live elsewhere (stackdrift/grow-fleet).",
+    "analyzedAt": "2026-06-28T03:55:19Z",
+    "gitCommitHash": "f81c79e3fa34e0cc3d8841ccb7267187ac9af17c"
+  },
+  "nodes": [
+    {
+      "id": "file:ezo_types/ezo_types.cpp",
+      "type": "file",
+      "name": "ezo_types.cpp",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "summary": "Core implementation of the typed EZO component: the EZOSensor base plus pH, EC, RTD and ORP subclasses that parse Atlas Scientific circuit responses, manage a power-gated I2C command queue, perform temperature-compensated reads, and publish calibration and diagnostic state.",
+      "tags": [
+        "sensor",
+        "i2c",
+        "esphome",
+        "serialization",
+        "component"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Polymorphic command-response dispatch: the same method names (setup/update/loop/handle_custom_response_) are overridden per circuit type, so this single translation unit holds the implementations for all of the header's subclasses."
+    },
+    {
+      "id": "file:ezo_types/ezo_types.h",
+      "type": "file",
+      "name": "ezo_types.h",
+      "filePath": "ezo_types/ezo_types.h",
+      "summary": "Header defining the ezo_types class hierarchy: the EZOSensor base (extending the upstream ezo component) and the PHSensor, ECSensor, RTDSensor and ORPSensor specializations, plus the TDSConversionFactorNumber control entity.",
+      "tags": [
+        "type-definition",
+        "sensor",
+        "esphome",
+        "data-model",
+        "component"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Follows the ESPHome platform pattern: typed sensor subclasses override virtual response handlers and receive collaborator entities (select/switch/number) via setter injection."
+    },
+    {
+      "id": "file:ezo_types/select.cpp",
+      "type": "file",
+      "name": "select.cpp",
+      "filePath": "ezo_types/select.cpp",
+      "summary": "Implements the CellConstantSelect platform, forwarding the user-selected EC probe cell-constant value to the owning ECSensor and querying the circuit on setup.",
+      "tags": [
+        "component",
+        "select",
+        "esphome",
+        "sensor",
+        "i2c"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:ezo_types/select.h",
+      "type": "file",
+      "name": "select.h",
+      "filePath": "ezo_types/select.h",
+      "summary": "Declares CellConstantSelect, an ESPHome Select entity that sets the Atlas Scientific EC circuit's cell constant (K value).",
+      "tags": [
+        "type-definition",
+        "select",
+        "esphome",
+        "component"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:ezo_types/switch.cpp",
+      "type": "file",
+      "name": "switch.cpp",
+      "filePath": "ezo_types/switch.cpp",
+      "summary": "Implements the ExtendedScaleSwitch platform, toggling the ORP circuit's extended-scale mode and reflecting the queried state back to the switch.",
+      "tags": [
+        "component",
+        "switch",
+        "esphome",
+        "sensor",
+        "i2c"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:ezo_types/switch.h",
+      "type": "file",
+      "name": "switch.h",
+      "filePath": "ezo_types/switch.h",
+      "summary": "Declares ExtendedScaleSwitch, an ESPHome Switch entity that enables or disables the Atlas Scientific ORP circuit's extended measurement scale.",
+      "tags": [
+        "type-definition",
+        "switch",
+        "esphome",
+        "component"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "class",
+      "name": "EZOSensor",
+      "filePath": "ezo_types/ezo_types.h",
+      "lineRange": [
+        21,
+        113
+      ],
+      "summary": "Abstract base for all typed EZO circuits; manages the power-gated I2C command queue, common status/calibration/device-info parsing, temperature-compensated reads, and a suite of diagnostic text and number sensors.",
+      "tags": [
+        "data-model",
+        "sensor",
+        "i2c",
+        "base-class",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:ezo_types/ezo_types.h:PHSensor",
+      "type": "class",
+      "name": "PHSensor",
+      "filePath": "ezo_types/ezo_types.h",
+      "lineRange": [
+        115,
+        146
+      ],
+      "summary": "pH circuit specialization handling slope-quality reporting, temperature compensation, and pH-specific calibration responses.",
+      "tags": [
+        "sensor",
+        "data-model",
+        "calibration",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:ezo_types/ezo_types.h:ECSensor",
+      "type": "class",
+      "name": "ECSensor",
+      "filePath": "ezo_types/ezo_types.h",
+      "lineRange": [
+        148,
+        188
+      ],
+      "summary": "Electrical-conductivity circuit specialization parsing CSV readings (EC, TDS, salinity, specific gravity), handling cell-constant queries, and exposing TDS conversion-factor control.",
+      "tags": [
+        "sensor",
+        "data-model",
+        "serialization",
+        "calibration",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:ezo_types/ezo_types.h:RTDSensor",
+      "type": "class",
+      "name": "RTDSensor",
+      "filePath": "ezo_types/ezo_types.h",
+      "lineRange": [
+        190,
+        207
+      ],
+      "summary": "Temperature (RTD) circuit specialization that tracks the last known temperature and only re-publishes on meaningful change, feeding temperature compensation for sibling circuits.",
+      "tags": [
+        "sensor",
+        "data-model",
+        "temperature",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:ezo_types/ezo_types.h:ORPSensor",
+      "type": "class",
+      "name": "ORPSensor",
+      "filePath": "ezo_types/ezo_types.h",
+      "lineRange": [
+        209,
+        224
+      ],
+      "summary": "Oxidation-reduction-potential circuit specialization supporting the extended measurement scale toggle and ORP-specific calibration parsing.",
+      "tags": [
+        "sensor",
+        "data-model",
+        "calibration",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:ezo_types/ezo_types.h:TDSConversionFactorNumber",
+      "type": "class",
+      "name": "TDSConversionFactorNumber",
+      "filePath": "ezo_types/ezo_types.h",
+      "lineRange": [
+        226,
+        235
+      ],
+      "summary": "ESPHome Number entity that pushes a user-set TDS conversion factor into the associated ECSensor.",
+      "tags": [
+        "component",
+        "number",
+        "esphome",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:ezo_types/select.h:CellConstantSelect",
+      "type": "class",
+      "name": "CellConstantSelect",
+      "filePath": "ezo_types/select.h",
+      "lineRange": [
+        12,
+        22
+      ],
+      "summary": "ESPHome Select entity that writes the chosen cell-constant (K) value to the associated ECSensor and triggers a cell-constant query on setup.",
+      "tags": [
+        "component",
+        "select",
+        "esphome",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:ezo_types/switch.h:ExtendedScaleSwitch",
+      "type": "class",
+      "name": "ExtendedScaleSwitch",
+      "filePath": "ezo_types/switch.h",
+      "lineRange": [
+        12,
+        22
+      ],
+      "summary": "ESPHome Switch entity that enables or disables the extended ORP measurement scale on the associated ORPSensor.",
+      "tags": [
+        "component",
+        "switch",
+        "esphome",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:update_diagnostic_sensors_",
+      "type": "function",
+      "name": "update_diagnostic_sensors_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        902,
+        1024
+      ],
+      "summary": "Publishes command-queue diagnostics — current/next/last commands, completion status, and queue size — with caching to suppress duplicate publishes.",
+      "tags": [
+        "diagnostics",
+        "sensor",
+        "publish",
+        "utility"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_reading_csv_",
+      "type": "function",
+      "name": "parse_reading_csv_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        529,
+        566
+      ],
+      "summary": "Parses the EC circuit's comma-separated reading line into EC, TDS, salinity and specific-gravity values and publishes each to its sensor.",
+      "tags": [
+        "parsing",
+        "serialization",
+        "sensor",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_slope_response_",
+      "type": "function",
+      "name": "parse_slope_response_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        369,
+        404
+      ],
+      "summary": "Parses the pH circuit Slope response into acid/alkaline slope-quality percentages and asymmetry potential, publishing each.",
+      "tags": [
+        "parsing",
+        "calibration",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_common_status_response_",
+      "type": "function",
+      "name": "parse_common_status_response_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        180,
+        214
+      ],
+      "summary": "Parses the shared EZO Status response to extract supply voltage and restart reason, publishing the voltage and reset-reason sensors.",
+      "tags": [
+        "parsing",
+        "diagnostics",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_cell_constant_response_",
+      "type": "function",
+      "name": "parse_cell_constant_response_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        645,
+        667
+      ],
+      "summary": "Parses the EC cell-constant (K) query response and maps the numeric value to the matching select option, warning on mismatch.",
+      "tags": [
+        "parsing",
+        "calibration",
+        "select"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:send_compensated_read_",
+      "type": "function",
+      "name": "send_compensated_read_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        880,
+        900
+      ],
+      "summary": "Issues a temperature-compensated read command (RT,<temp>) using the linked RTD sensor value, falling back to a plain read when no temperature is available.",
+      "tags": [
+        "i2c",
+        "temperature",
+        "command"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:check_temperature_change_",
+      "type": "function",
+      "name": "check_temperature_change_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        702,
+        721
+      ],
+      "summary": "Compares a new RTD reading against the last known temperature and triggers downstream temperature-compensation updates only when the change exceeds threshold.",
+      "tags": [
+        "temperature",
+        "event-handler",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_device_information_response_",
+      "type": "function",
+      "name": "parse_device_information_response_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        222,
+        240
+      ],
+      "summary": "Parses the device-information response to extract and publish the circuit's firmware version string.",
+      "tags": [
+        "parsing",
+        "diagnostics",
+        "text-sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:dump_config_base_",
+      "type": "function",
+      "name": "dump_config_base_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        151,
+        166
+      ],
+      "summary": "Logs the shared EZO configuration block and the common diagnostic sensors during ESPHome's dump_config phase.",
+      "tags": [
+        "logging",
+        "configuration",
+        "diagnostics"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_extended_scale_response_",
+      "type": "function",
+      "name": "parse_extended_scale_response_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        816,
+        827
+      ],
+      "summary": "Parses the ORP extended-scale query response and publishes the boolean state to the extended-scale switch.",
+      "tags": [
+        "parsing",
+        "switch",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:handle_common_responses_",
+      "type": "function",
+      "name": "handle_common_responses_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        168,
+        178
+      ],
+      "summary": "Routes a raw circuit response to the common status or calibration parser based on its command prefix.",
+      "tags": [
+        "parsing",
+        "dispatch",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:ezo_types/ezo_types.cpp:parse_tds_response_",
+      "type": "function",
+      "name": "parse_tds_response_",
+      "filePath": "ezo_types/ezo_types.cpp",
+      "lineRange": [
+        669,
+        678
+      ],
+      "summary": "Parses the EC TDS conversion-factor query response and publishes the resulting value.",
+      "tags": [
+        "parsing",
+        "sensor",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:mlx90640/MLX90640_API.cpp",
+      "type": "file",
+      "name": "MLX90640_API.cpp",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "summary": "Vendored Melexis MLX90640 driver API: acquires and validates frame data over I2C, parses the EEPROM calibration dump into parameters, and computes per-pixel object temperatures (To), normalized images, supply voltage (Vdd), and ambient temperature (Ta).",
+      "tags": [
+        "driver",
+        "thermal-imaging",
+        "vendored",
+        "calibration",
+        "sensor"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Heavy use of byte/nibble bit-extraction macros and two's-complement fix-ups to unpack the packed EEPROM calibration layout."
+    },
+    {
+      "id": "file:mlx90640/MLX90640_API.h",
+      "type": "file",
+      "name": "MLX90640_API.h",
+      "filePath": "mlx90640/MLX90640_API.h",
+      "summary": "Header for the vendored Melexis driver API; declares the paramsMLX90640 calibration struct and the public MLX90640_* acquisition, configuration, and temperature-calculation entry points.",
+      "tags": [
+        "driver",
+        "header",
+        "type-definition",
+        "vendored",
+        "thermal-imaging"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "type": "file",
+      "name": "MLX90640_I2C_Driver.cpp",
+      "filePath": "mlx90640/MLX90640_I2C_Driver.cpp",
+      "summary": "I2C transport shim that adapts the vendored Melexis driver's read/write/reset primitives onto an injected ESPHome i2c::I2CBus instance.",
+      "tags": [
+        "driver",
+        "i2c",
+        "hardware-abstraction",
+        "vendored",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:mlx90640/MLX90640_I2C_Driver.h",
+      "type": "file",
+      "name": "MLX90640_I2C_Driver.h",
+      "filePath": "mlx90640/MLX90640_I2C_Driver.h",
+      "summary": "Header declaring the I2C transport primitives and the ESPHome bus-injection hook used by the vendored Melexis driver.",
+      "tags": [
+        "driver",
+        "header",
+        "i2c",
+        "vendored",
+        "hardware-abstraction"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:mlx90640/mlx90640.cpp",
+      "type": "file",
+      "name": "mlx90640.cpp",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "summary": "ESPHome component implementation for the MLX90640 thermal camera: polls and calibrates frames, computes whole-frame and ROI temperature statistics, bicubically upscales the image, and serves a self-contained thermal viewer web page plus on-demand JPEG renders over HTTP.",
+      "tags": [
+        "component",
+        "sensor",
+        "thermal-imaging",
+        "web-server",
+        "api-handler"
+      ],
+      "complexity": "complex",
+      "languageNotes": "A large embedded raw-string HTML literal (the viewer page) sits between the interpolation helpers and the rendering code."
+    },
+    {
+      "id": "file:mlx90640/mlx90640.h",
+      "type": "file",
+      "name": "mlx90640.h",
+      "filePath": "mlx90640/mlx90640.h",
+      "summary": "Declares the MLX90640Component (PollingComponent + I2CDevice) together with its companion ESPHome Number/Select/Switch control classes, the ROIConfig struct, and the thermal palette tables.",
+      "tags": [
+        "component",
+        "data-model",
+        "type-definition",
+        "sensor",
+        "thermal-imaging"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:mlx90640/mlx90640.h:ROIConfig",
+      "type": "class",
+      "name": "ROIConfig",
+      "filePath": "mlx90640/mlx90640.h",
+      "lineRange": [
+        26,
+        31
+      ],
+      "summary": "Plain struct holding region-of-interest settings (enabled flag, center row/col, and square size) for focused temperature analysis.",
+      "tags": [
+        "data-model",
+        "config",
+        "roi",
+        "struct"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:mlx90640/mlx90640.h:MLX90640Component",
+      "type": "class",
+      "name": "MLX90640Component",
+      "filePath": "mlx90640/mlx90640.h",
+      "lineRange": [
+        33,
+        270
+      ],
+      "summary": "Core ESPHome polling component driving the MLX90640: sensor setup, frame acquisition and calibration, ROI/temperature statistics, image interpolation, thermal palettes, and the HTTP thermal viewer.",
+      "tags": [
+        "component",
+        "sensor",
+        "thermal-imaging",
+        "entry-point",
+        "web-server"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:mlx90640/mlx90640.h:MLX90640Number",
+      "type": "class",
+      "name": "MLX90640Number",
+      "filePath": "mlx90640/mlx90640.h",
+      "lineRange": [
+        287,
+        308
+      ],
+      "summary": "ESPHome Number control bound to the parent component, exposing tunable values (update interval, ROI center/size, emissivity, reflected temperature) with flash persistence.",
+      "tags": [
+        "component",
+        "control",
+        "number",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:mlx90640/mlx90640.h:MLX90640Select",
+      "type": "class",
+      "name": "MLX90640Select",
+      "filePath": "mlx90640/mlx90640.h",
+      "lineRange": [
+        311,
+        330
+      ],
+      "summary": "ESPHome Select control bound to the parent component for enumerated options such as the active thermal palette, with restore support.",
+      "tags": [
+        "component",
+        "control",
+        "select",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:mlx90640/mlx90640.h:MLX90640Switch",
+      "type": "class",
+      "name": "MLX90640Switch",
+      "filePath": "mlx90640/mlx90640.h",
+      "lineRange": [
+        333,
+        348
+      ],
+      "summary": "ESPHome Switch control bound to the parent component toggling boolean features such as ROI enable, web overlay, and auto reflected-temperature.",
+      "tags": [
+        "component",
+        "control",
+        "switch",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_SynchFrame",
+      "type": "function",
+      "name": "MLX90640_SynchFrame",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        45,
+        65
+      ],
+      "summary": "Resets the status register and polls the data-ready flag over I2C to synchronize to the start of a new frame.",
+      "tags": [
+        "driver",
+        "i2c",
+        "synchronization",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_TriggerMeasurement",
+      "type": "function",
+      "name": "MLX90640_TriggerMeasurement",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        67,
+        101
+      ],
+      "summary": "Triggers a single on-demand measurement by writing the control register and verifying acceptance, issuing a general reset on failure.",
+      "tags": [
+        "driver",
+        "i2c",
+        "measurement",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetFrameData",
+      "type": "function",
+      "name": "MLX90640_GetFrameData",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        103,
+        157
+      ],
+      "summary": "Reads a full subpage frame from device RAM over I2C, waiting on the data-ready flag, then validates auxiliary and frame data integrity.",
+      "tags": [
+        "driver",
+        "i2c",
+        "frame-acquisition",
+        "validation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_ExtractParameters",
+      "type": "function",
+      "name": "MLX90640_ExtractParameters",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        208,
+        227
+      ],
+      "summary": "Dispatcher that parses the raw EEPROM dump into the calibration parameter struct by invoking each per-parameter extraction helper.",
+      "tags": [
+        "driver",
+        "calibration",
+        "factory",
+        "parsing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_CalculateTo",
+      "type": "function",
+      "name": "MLX90640_CalculateTo",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        354,
+        473
+      ],
+      "summary": "Core radiometric routine converting a raw frame plus calibration parameters into per-pixel object temperatures using emissivity, gain, offset, and the Ks/To compensation model.",
+      "tags": [
+        "driver",
+        "thermal-imaging",
+        "calibration",
+        "algorithm"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Floating-point heavy with repeated pow/sqrt per pixel across the 768-element frame."
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetImage",
+      "type": "function",
+      "name": "MLX90640_GetImage",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        477,
+        555
+      ],
+      "summary": "Computes a normalized per-pixel image (relative, without absolute temperature) from a raw frame and calibration parameters.",
+      "tags": [
+        "driver",
+        "thermal-imaging",
+        "image",
+        "algorithm"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetVdd",
+      "type": "function",
+      "name": "MLX90640_GetVdd",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        559,
+        570
+      ],
+      "summary": "Derives the sensor supply voltage (Vdd) from the frame's raw ADC reading and calibration constants.",
+      "tags": [
+        "driver",
+        "calibration",
+        "sensor",
+        "voltage"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetTa",
+      "type": "function",
+      "name": "MLX90640_GetTa",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        574,
+        590
+      ],
+      "summary": "Derives the ambient (die) temperature Ta from the PTAT/Vbe readings and calibration parameters.",
+      "tags": [
+        "driver",
+        "calibration",
+        "sensor",
+        "temperature"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_BadPixelsCorrection",
+      "type": "function",
+      "name": "MLX90640_BadPixelsCorrection",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        597,
+        659
+      ],
+      "summary": "Interpolates over flagged bad/outlier pixels using neighboring values, honoring the chess or interleaved read pattern.",
+      "tags": [
+        "driver",
+        "thermal-imaging",
+        "correction",
+        "bad-pixels"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetRefreshRate",
+      "type": "function",
+      "name": "MLX90640_SetRefreshRate",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        268,
+        284
+      ],
+      "summary": "Writes the configured refresh-rate bits into the control register over I2C, preserving the other control bits.",
+      "tags": [
+        "driver",
+        "i2c",
+        "configuration",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetResolution",
+      "type": "function",
+      "name": "MLX90640_SetResolution",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        231,
+        248
+      ],
+      "summary": "Writes the configured ADC resolution bits into the control register over I2C, preserving the other control bits.",
+      "tags": [
+        "driver",
+        "i2c",
+        "configuration",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetChessMode",
+      "type": "function",
+      "name": "MLX90640_SetChessMode",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        321,
+        334
+      ],
+      "summary": "Switches the sensor into chess (checkerboard) read pattern via the control register.",
+      "tags": [
+        "driver",
+        "i2c",
+        "configuration",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:ExtractAlphaParameters",
+      "type": "function",
+      "name": "ExtractAlphaParameters",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        763,
+        843
+      ],
+      "summary": "Reconstructs the per-pixel sensitivity (alpha) calibration coefficients from the EEPROM dump using scale and accelerator nibbles.",
+      "tags": [
+        "driver",
+        "calibration",
+        "parsing",
+        "eeprom"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_API.cpp:ExtractDeviatingPixels",
+      "type": "function",
+      "name": "ExtractDeviatingPixels",
+      "filePath": "mlx90640/MLX90640_API.cpp",
+      "lineRange": [
+        1126,
+        1187
+      ],
+      "summary": "Scans the EEPROM for broken and outlier pixel addresses and flags adjacency conflicts for later correction.",
+      "tags": [
+        "driver",
+        "calibration",
+        "bad-pixels",
+        "eeprom"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CRead",
+      "type": "function",
+      "name": "MLX90640_I2CRead",
+      "filePath": "mlx90640/MLX90640_I2C_Driver.cpp",
+      "lineRange": [
+        37,
+        71
+      ],
+      "summary": "Reads N 16-bit words starting at a device memory address using an ESPHome i2c write-then-read transaction, assembling big-endian words.",
+      "tags": [
+        "driver",
+        "i2c",
+        "read",
+        "hardware-abstraction"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "function",
+      "name": "MLX90640_I2CWrite",
+      "filePath": "mlx90640/MLX90640_I2C_Driver.cpp",
+      "lineRange": [
+        78,
+        94
+      ],
+      "summary": "Writes a single 16-bit word to a device memory address and reads it back to confirm the write succeeded.",
+      "tags": [
+        "driver",
+        "i2c",
+        "write",
+        "hardware-abstraction"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CGeneralReset",
+      "type": "function",
+      "name": "MLX90640_I2CGeneralReset",
+      "filePath": "mlx90640/MLX90640_I2C_Driver.cpp",
+      "lineRange": [
+        97,
+        105
+      ],
+      "summary": "Issues an I2C general-call reset to recover the sensor into a known state.",
+      "tags": [
+        "driver",
+        "i2c",
+        "reset",
+        "hardware-abstraction"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:setup",
+      "type": "function",
+      "name": "setup",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        13,
+        32
+      ],
+      "summary": "Component setup hook: initializes the thermal sensor, selects the active palette, syncs ROI state from controls, and starts the HTTP web server.",
+      "tags": [
+        "component",
+        "entry-point",
+        "initialization",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:setup_thermal_",
+      "type": "function",
+      "name": "setup_thermal_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        63,
+        113
+      ],
+      "summary": "Initializes the MLX90640 over I2C: dumps and extracts EEPROM calibration, then applies the configured refresh rate, resolution, and read pattern.",
+      "tags": [
+        "component",
+        "sensor",
+        "initialization",
+        "calibration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "type": "function",
+      "name": "update_thermal_data_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        115,
+        240
+      ],
+      "summary": "Polling routine that acquires a frame, computes Vdd/Ta and per-pixel temperatures, applies bad-pixel correction, interpolates, derives statistics, and publishes sensor states.",
+      "tags": [
+        "component",
+        "sensor",
+        "frame-acquisition",
+        "data-pipeline"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:calculate_roi_bounds_",
+      "type": "function",
+      "name": "calculate_roi_bounds_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        243,
+        254
+      ],
+      "summary": "Clamps a region-of-interest's center and size to valid pixel row/column ranges.",
+      "tags": [
+        "component",
+        "roi",
+        "utility",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:process_roi_temperatures_",
+      "type": "function",
+      "name": "process_roi_temperatures_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        257,
+        312
+      ],
+      "summary": "Computes min/max/average/median temperatures within the configured ROI and publishes the ROI sensor states.",
+      "tags": [
+        "component",
+        "roi",
+        "statistics",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:interpolate_image_",
+      "type": "function",
+      "name": "interpolate_image_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        427,
+        442
+      ],
+      "summary": "Bicubically upscales the low-resolution thermal frame into a higher-resolution image buffer.",
+      "tags": [
+        "component",
+        "thermal-imaging",
+        "interpolation",
+        "image"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:temp_to_color",
+      "type": "function",
+      "name": "temp_to_color",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        671,
+        684
+      ],
+      "summary": "Maps a temperature within a min/max range to an RGB565 color sampled from the active thermal palette table.",
+      "tags": [
+        "component",
+        "thermal-imaging",
+        "palette",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:set_active_palette_",
+      "type": "function",
+      "name": "set_active_palette_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        686,
+        712
+      ],
+      "summary": "Selects the active thermal color palette table based on the configured palette name.",
+      "tags": [
+        "component",
+        "thermal-imaging",
+        "palette",
+        "configuration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:get_roi_overlay_bounds",
+      "type": "function",
+      "name": "get_roi_overlay_bounds",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        715,
+        734
+      ],
+      "summary": "Maps ROI pixel bounds into image-space rectangle coordinates for the rendered overlay.",
+      "tags": [
+        "component",
+        "roi",
+        "overlay",
+        "rendering"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:sync_roi_state_from_controls",
+      "type": "function",
+      "name": "sync_roi_state_from_controls",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        1335,
+        1373
+      ],
+      "summary": "Reconciles the ROIConfig with the current values of the ROI Number/Switch controls at startup.",
+      "tags": [
+        "component",
+        "roi",
+        "control",
+        "synchronization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:control",
+      "type": "function",
+      "name": "control",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        1445,
+        1492
+      ],
+      "summary": "Number control handler applying a changed value (update interval, ROI parameters, emissivity, reflected temperature) back onto the parent component and persisting it.",
+      "tags": [
+        "component",
+        "control",
+        "number",
+        "event-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:write_state",
+      "type": "function",
+      "name": "write_state",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        1516,
+        1535
+      ],
+      "summary": "Switch control handler toggling a boolean feature (web overlay, ROI enable, auto reflected temperature) on the parent and publishing the new state.",
+      "tags": [
+        "component",
+        "control",
+        "switch",
+        "event-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:setup_web_server_",
+      "type": "function",
+      "name": "setup_web_server_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        785,
+        818
+      ],
+      "summary": "Registers HTTP request handlers for the thermal viewer page and the on-demand JPEG image endpoint on the ESPHome web server.",
+      "tags": [
+        "component",
+        "web-server",
+        "api-handler",
+        "http"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:handle_thermal_image_request_",
+      "type": "function",
+      "name": "handle_thermal_image_request_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        820,
+        829
+      ],
+      "summary": "HTTP handler for the thermal image endpoint that validates sensor readiness and delegates rendering to the JPEG generator.",
+      "tags": [
+        "component",
+        "web-server",
+        "api-handler",
+        "http"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:handle_thermal_page_request_",
+      "type": "function",
+      "name": "handle_thermal_page_request_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        831,
+        859
+      ],
+      "summary": "HTTP handler that serves the self-contained thermal viewer HTML page with substituted image dimensions.",
+      "tags": [
+        "component",
+        "web-server",
+        "api-handler",
+        "http"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:generate_jpg_jpegenc_",
+      "type": "function",
+      "name": "generate_jpg_jpegenc_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        861,
+        961
+      ],
+      "summary": "Renders the current thermal frame to an RGB565 buffer with ROI and temperature overlays, JPEG-encodes it via JPEGENC, and streams it as the HTTP response.",
+      "tags": [
+        "component",
+        "web-server",
+        "jpeg",
+        "rendering"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Heap-allocates the large pixel and JPEG buffers to avoid overflowing the constrained esp_http_server task stack."
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:add_roi_overlay_to_image_",
+      "type": "function",
+      "name": "add_roi_overlay_to_image_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        963,
+        1060
+      ],
+      "summary": "Draws the ROI rectangle and crosshair overlay onto the rendered image buffer.",
+      "tags": [
+        "component",
+        "rendering",
+        "roi",
+        "overlay"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:mlx90640/mlx90640.cpp:add_temperature_text_to_image_",
+      "type": "function",
+      "name": "add_temperature_text_to_image_",
+      "filePath": "mlx90640/mlx90640.cpp",
+      "lineRange": [
+        1062,
+        1333
+      ],
+      "summary": "Draws min/max/average temperature readouts onto the image using a hand-rolled bitmap glyph renderer over horizontal/vertical line and pixel primitives.",
+      "tags": [
+        "component",
+        "rendering",
+        "overlay",
+        "text"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:ezo_types/select.py",
+      "type": "file",
+      "name": "select.py",
+      "filePath": "ezo_types/select.py",
+      "summary": "ESPHome select-platform codegen for the ezo_types component; declares the CellConstantSelect C++ class handle and a schema factory for the EC probe's cell-constant configuration select.",
+      "tags": [
+        "codegen",
+        "config-schema",
+        "select",
+        "esphome",
+        "factory"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Uses the esphome.codegen (cg) namespace API to bind a C++ class to a Python schema; the underscore-prefixed schema function is a private factory consumed by sensor.py."
+    },
+    {
+      "id": "file:ezo_types/sensor.py",
+      "type": "file",
+      "name": "sensor.py",
+      "filePath": "ezo_types/sensor.py",
+      "summary": "Main ESPHome sensor-platform codegen for the ezo_types component (Atlas Scientific EZO circuits); defines the full CONFIG_SCHEMA, per-type sensor class handles, and the to_code generator that emits C++ for pH/EC/RTD/ORP probes with their diagnostic and compensation sensors.",
+      "tags": [
+        "codegen",
+        "config-schema",
+        "data-model",
+        "esphome",
+        "i2c"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Binds stock `ezo` C++ handles locally via cg.esphome_ns.namespace to avoid patching esphome core; uses CallbackAutomation for on_slope since stock ezo lacks a SlopeTrigger class."
+    },
+    {
+      "id": "file:ezo_types/switch.py",
+      "type": "file",
+      "name": "switch.py",
+      "filePath": "ezo_types/switch.py",
+      "summary": "ESPHome switch-platform codegen for the ezo_types component; declares the ExtendedScaleSwitch C++ class handle and a schema factory for the ORP probe's extended-scale toggle.",
+      "tags": [
+        "codegen",
+        "config-schema",
+        "switch",
+        "esphome",
+        "factory"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Uses the esphome.codegen (cg) namespace API; the underscore-prefixed schema function is a private factory consumed by sensor.py."
+    },
+    {
+      "id": "function:ezo_types/sensor.py:setup_atlas_sensor_base",
+      "type": "function",
+      "name": "setup_atlas_sensor_base",
+      "filePath": "ezo_types/sensor.py",
+      "lineRange": [
+        334,
+        400
+      ],
+      "summary": "Wires up the shared Atlas EZO sensor base: registers the component, I2C device, and core diagnostic sensors (voltage, reset reason, firmware version, calibration status, command queue), then links temperature-compensation, RTD, and the power/compensation/calibration switches.",
+      "tags": [
+        "codegen",
+        "setup",
+        "i2c",
+        "diagnostic",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:ezo_types/sensor.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "ezo_types/sensor.py",
+      "lineRange": [
+        403,
+        467
+      ],
+      "summary": "ESPHome codegen entry point that instantiates the per-type EZO sensor variable, invokes the shared base setup, builds on_slope callback automations, and registers pH/EC/ORP-specific sensors, the cell-constant select, the TDS conversion-factor number, and the extended-scale switch.",
+      "tags": [
+        "codegen",
+        "entry-point",
+        "automation",
+        "esphome",
+        "factory"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:m5cores3_display/m5cores3_display.h",
+      "type": "file",
+      "name": "m5cores3_display.h",
+      "filePath": "m5cores3_display/m5cores3_display.h",
+      "summary": "Header declaring the M5CoreS3Display ESPHome component plus forward declarations for its M5UnitCO2L and MLX90640Thermal data sources.",
+      "tags": [
+        "type-definition",
+        "component",
+        "esphome",
+        "display"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:m5cores3_display/m5cores3_display.h:M5CoreS3Display",
+      "type": "class",
+      "name": "M5CoreS3Display",
+      "filePath": "m5cores3_display/m5cores3_display.h",
+      "lineRange": [
+        19,
+        46
+      ],
+      "summary": "ESPHome Component that drives the CoreS3 built-in screen, rendering environmental data and an MLX90640 thermal image from injected sensor components.",
+      "tags": [
+        "component",
+        "display-rendering",
+        "thermal-imaging",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:m5cores3_power/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "m5cores3_power/__init__.py",
+      "summary": "ESPHome codegen entry point for the m5cores3_power component, registering the AXP2101 PMIC battery monitor and a diagnostics-logging action.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "power-management"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_power/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "m5cores3_power/__init__.py",
+      "lineRange": [
+        33,
+        51
+      ],
+      "summary": "Creates the M5CoreS3Power C++ instance and wires its battery level, battery-present, and charging sensor references.",
+      "tags": [
+        "codegen",
+        "configuration",
+        "esphome",
+        "dependency-wiring"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:m5cores3_power/m5cores3_power.cpp",
+      "type": "file",
+      "name": "m5cores3_power.cpp",
+      "filePath": "m5cores3_power/m5cores3_power.cpp",
+      "summary": "Runtime implementation of the CoreS3 power component, polling the AXP2101 PMIC for battery state and exposing detailed register diagnostics.",
+      "tags": [
+        "power-management",
+        "hardware-driver",
+        "esphome",
+        "battery"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_power/m5cores3_power.cpp:log_axp2101_diagnostics",
+      "type": "function",
+      "name": "log_axp2101_diagnostics",
+      "filePath": "m5cores3_power/m5cores3_power.cpp",
+      "lineRange": [
+        10,
+        74
+      ],
+      "summary": "Reads and logs a comprehensive snapshot of AXP2101 PMIC registers (charge status, voltages, currents, rails) for power debugging.",
+      "tags": [
+        "diagnostics",
+        "power-management",
+        "logging",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_power/m5cores3_power.cpp:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "m5cores3_power/m5cores3_power.cpp",
+      "lineRange": [
+        86,
+        107
+      ],
+      "summary": "Periodically reads battery percentage, presence, and charging state from the AXP2101 and publishes them to the bound sensors.",
+      "tags": [
+        "lifecycle",
+        "power-management",
+        "sensor",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_power/m5cores3_power.cpp:dump_config",
+      "type": "function",
+      "name": "dump_config",
+      "filePath": "m5cores3_power/m5cores3_power.cpp",
+      "lineRange": [
+        109,
+        120
+      ],
+      "summary": "Logs the configured power component settings and bound battery sensors at startup.",
+      "tags": [
+        "diagnostics",
+        "logging",
+        "esphome",
+        "lifecycle"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:m5cores3_power/m5cores3_power.h",
+      "type": "file",
+      "name": "m5cores3_power.h",
+      "filePath": "m5cores3_power/m5cores3_power.h",
+      "summary": "Header declaring the M5CoreS3Power ESPHome component and its battery level/present/charging sensor setters.",
+      "tags": [
+        "type-definition",
+        "component",
+        "esphome",
+        "power-management"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:m5cores3_power/m5cores3_power.h:M5CoreS3Power",
+      "type": "class",
+      "name": "M5CoreS3Power",
+      "filePath": "m5cores3_power/m5cores3_power.h",
+      "lineRange": [
+        12,
+        35
+      ],
+      "summary": "ESPHome Component wrapping the AXP2101 PMIC to expose battery level, presence, and charging state as sensors with diagnostics support.",
+      "tags": [
+        "component",
+        "power-management",
+        "battery",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:m5cores3_touch/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "m5cores3_touch/__init__.py",
+      "summary": "ESPHome codegen entry point for the m5cores3_touch component, registering the touchscreen driver and its on-touch/on-release automation triggers.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "touch-input"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:m5cores3_touch/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "m5cores3_touch/__init__.py",
+      "lineRange": [
+        35,
+        48
+      ],
+      "summary": "Creates the M5CoreS3Touch C++ instance and registers configured on-touch and on-release trigger automations.",
+      "tags": [
+        "codegen",
+        "configuration",
+        "esphome",
+        "event-handler"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:m5cores3_touch/m5cores3_touch.cpp",
+      "type": "file",
+      "name": "m5cores3_touch.cpp",
+      "filePath": "m5cores3_touch/m5cores3_touch.cpp",
+      "summary": "Runtime implementation of the CoreS3 touchscreen driver, polling the controller and firing touch/release triggers with touch-point coordinates.",
+      "tags": [
+        "touch-input",
+        "hardware-driver",
+        "event-handler",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_touch/m5cores3_touch.cpp:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "m5cores3_touch/m5cores3_touch.cpp",
+      "lineRange": [
+        18,
+        86
+      ],
+      "summary": "Polls the touch controller each cycle, debounces touch state transitions, and dispatches on-touch and on-release triggers with coordinates.",
+      "tags": [
+        "touch-input",
+        "event-handler",
+        "polling",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:m5cores3_touch/m5cores3_touch.h",
+      "type": "file",
+      "name": "m5cores3_touch.h",
+      "filePath": "m5cores3_touch/m5cores3_touch.h",
+      "summary": "Header declaring the M5CoreS3Touch component, the TouchPoint struct, and the TouchTrigger automation trigger type.",
+      "tags": [
+        "type-definition",
+        "component",
+        "touch-input",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:m5cores3_touch/m5cores3_touch.h:M5CoreS3Touch",
+      "type": "class",
+      "name": "M5CoreS3Touch",
+      "filePath": "m5cores3_touch/m5cores3_touch.h",
+      "lineRange": [
+        19,
+        38
+      ],
+      "summary": "ESPHome Component driving the CoreS3 capacitive touchscreen and exposing on-touch/on-release automation triggers.",
+      "tags": [
+        "component",
+        "touch-input",
+        "event-handler",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:mlx90640/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "mlx90640/__init__.py",
+      "summary": "Extensive ESPHome codegen for the MLX90640 thermal camera component, defining the full config schema (hardware, temperature sensors, ROI, thermography params, web server, runtime controls) and generating the C++ component wiring.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "thermal-imaging",
+        "schema-definition"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Large CONFIG_SCHEMA with cv validators (including validate_web_server_config) plus a 350+ line to_code that conditionally wires many optional sensors and runtime parameters."
+    },
+    {
+      "id": "function:mlx90640/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "mlx90640/__init__.py",
+      "lineRange": [
+        290,
+        649
+      ],
+      "summary": "Builds the MLX90640 C++ component, applying all configured hardware, thermography, ROI, color-palette, web-server, and per-sensor settings from the validated config.",
+      "tags": [
+        "codegen",
+        "configuration",
+        "esphome",
+        "thermal-imaging"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:mlx90640/example.yaml",
+      "type": "config",
+      "name": "example.yaml",
+      "filePath": "mlx90640/example.yaml",
+      "summary": "Example ESPHome device configuration demonstrating the mlx90640 thermal camera component on an ESP32 over I2C, including external_components wiring and sensor exposure.",
+      "tags": [
+        "configuration",
+        "example",
+        "esphome",
+        "thermal-imaging"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:mlx90640/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "mlx90640/README.md",
+      "summary": "Documentation for the MLX90640 thermal camera component covering quick start, hardware requirements, configuration (ROI, thermography, web server), color palettes, and the API for custom components.",
+      "tags": [
+        "documentation",
+        "thermal-imaging",
+        "configuration-reference",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:scd4x_alerts/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "scd4x_alerts/README.md",
+      "summary": "Comprehensive documentation for the scd4x_alerts component covering threshold-based CO2/temperature/humidity/VPD alerting, configuration variables, usage examples, display integration, automation, and troubleshooting.",
+      "tags": [
+        "documentation",
+        "alerting",
+        "configuration-reference",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:scd4x_alerts/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "scd4x_alerts/__init__.py",
+      "summary": "ESPHome codegen for the scd4x_alerts component, defining the config schema for threshold alert binary sensors and number controls and generating the C++ component that compares sensor readings against thresholds.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "alerting"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Combines a binary_sensor_schema helper with a large to_code that registers alert binary sensors and writable threshold number entities."
+    },
+    {
+      "id": "function:scd4x_alerts/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "scd4x_alerts/__init__.py",
+      "lineRange": [
+        196,
+        385
+      ],
+      "summary": "Builds the SCD4x alerts C++ component, wiring CO2/temperature/humidity/VPD source sensors, registering threshold alert binary sensors, and exposing configurable threshold number controls.",
+      "tags": [
+        "codegen",
+        "configuration",
+        "esphome",
+        "alerting"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:board_m5cores3/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "board_m5cores3/__init__.py",
+      "summary": "ESPHome codegen entry point for the M5Stack CoreS3 board component, registering the BoardM5CoreS3 native component during configuration validation.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "board-support"
+      ],
+      "complexity": "simple",
+      "languageNotes": "ESPHome external-component pattern: to_code() bridges YAML config to generated C++ via cg.new_Pvariable and cg.register_component."
+    },
+    {
+      "id": "file:board_m5cores3/board_m5cores3.cpp",
+      "type": "file",
+      "name": "board_m5cores3.cpp",
+      "filePath": "board_m5cores3/board_m5cores3.cpp",
+      "summary": "Runtime implementation of the M5Stack CoreS3 board init that brings up the AXP2101 PMIC, AW9523 expander, and display backlight during setup.",
+      "tags": [
+        "board-support",
+        "hardware-init",
+        "esphome",
+        "power-management"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:board_m5cores3/board_m5cores3.cpp:setup",
+      "type": "function",
+      "name": "setup",
+      "filePath": "board_m5cores3/board_m5cores3.cpp",
+      "lineRange": [
+        10,
+        44
+      ],
+      "summary": "Brings up the CoreS3 board hardware on boot: configures the AXP2101 PMIC rails, enables the AW9523 expander outputs, and sets the display backlight brightness.",
+      "tags": [
+        "hardware-init",
+        "board-support",
+        "power-management",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:board_m5cores3/board_m5cores3.h",
+      "type": "file",
+      "name": "board_m5cores3.h",
+      "filePath": "board_m5cores3/board_m5cores3.h",
+      "summary": "Header declaring the BoardM5CoreS3 ESPHome Component subclass responsible for CoreS3 board-level hardware bring-up.",
+      "tags": [
+        "board-support",
+        "type-definition",
+        "esphome",
+        "component"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:board_m5cores3/board_m5cores3.h:BoardM5CoreS3",
+      "type": "class",
+      "name": "BoardM5CoreS3",
+      "filePath": "board_m5cores3/board_m5cores3.h",
+      "lineRange": [
+        17,
+        25
+      ],
+      "summary": "ESPHome Component that performs M5Stack CoreS3 board-level hardware bring-up (PMIC, GPIO expander, backlight) at high setup priority.",
+      "tags": [
+        "component",
+        "board-support",
+        "hardware-init",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:docker/esphome",
+      "type": "file",
+      "name": "esphome",
+      "filePath": "docker/esphome",
+      "summary": "Bash wrapper that runs the ESPHome CLI inside the dev container against this repo, forcing the local Docker daemon so USB, mDNS, and OTA access work for scratch configs and component examples.",
+      "tags": [
+        "script",
+        "tooling",
+        "developer-experience",
+        "wrapper"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Forces DOCKER_CONTEXT=default and execs `docker compose run --rm esphome` so a remote default context does not break local device flashing."
+    },
+    {
+      "id": "config:docker/esphome-dev.yml",
+      "type": "config",
+      "name": "esphome-dev.yml",
+      "filePath": "docker/esphome-dev.yml",
+      "summary": "Docker Compose definition for the local ESPHome development container, mounting the repo at /config and exposing USB devices and host networking for the dev build/flash loop.",
+      "tags": [
+        "configuration",
+        "docker-compose",
+        "developer-experience",
+        "containerization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:ezo_types/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "ezo_types/README.md",
+      "summary": "Documentation for the ezo_types component covering pH/EC/RTD/ORP Atlas Scientific EZO sensor configuration, temperature compensation, unit handling, and state readback.",
+      "tags": [
+        "documentation",
+        "sensor",
+        "configuration-reference",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:ezo_types/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "ezo_types/__init__.py",
+      "summary": "Package namespace marker for the ezo_types component, establishing the codegen namespace shared by its sensor platforms.",
+      "tags": [
+        "barrel",
+        "namespace",
+        "esphome",
+        "codegen"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:ezo_types/number.py",
+      "type": "file",
+      "name": "number.py",
+      "filePath": "ezo_types/number.py",
+      "summary": "ESPHome number-platform codegen for ezo_types, registering writable number entities (e.g. temperature compensation) backed by EZO sensors.",
+      "tags": [
+        "codegen",
+        "number-platform",
+        "esphome",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:grow_env_monitor/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "grow_env_monitor/__init__.py",
+      "summary": "ESPHome codegen entry point for the grow_env_monitor component, wiring the MLX90640 thermal camera, CO2/temp/humidity sensors, ROI stats, light, and alert sensors into the generated GrowEnvMonitor instance.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "sensor-aggregation"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Uses cg.get_variable to resolve many optional sensor references and conditionally calls per-sensor setters on the generated component."
+    },
+    {
+      "id": "function:grow_env_monitor/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "grow_env_monitor/__init__.py",
+      "lineRange": [
+        66,
+        130
+      ],
+      "summary": "Builds the GrowEnvMonitor C++ instance and conditionally injects each configured sensor reference (CO2, temperature, humidity, thermal min/max/avg, ROI stats, light, and alert binary sensors) and display settings.",
+      "tags": [
+        "codegen",
+        "configuration",
+        "esphome",
+        "dependency-wiring"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "type": "file",
+      "name": "grow_env_monitor.cpp",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "summary": "Full runtime implementation of the grow environment monitor: renders sensor readings, VPD, alerts, and a live MLX90640 thermal image with ROI overlay to the CoreS3 display, refreshing only changed values each loop.",
+      "tags": [
+        "display-rendering",
+        "thermal-imaging",
+        "sensor",
+        "esphome",
+        "ui"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Partial-redraw strategy: dedicated draw_*_value_ helpers repaint only changed regions to avoid full-screen flicker on the embedded display."
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:setup",
+      "type": "function",
+      "name": "setup",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        12,
+        27
+      ],
+      "summary": "Initializes the CoreS3 display (rotation, brightness, clear) and paints the initial static screen layout.",
+      "tags": [
+        "lifecycle",
+        "display-rendering",
+        "esphome",
+        "initialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        29,
+        47
+      ],
+      "summary": "Main loop that periodically refreshes the thermal image and pushes changed sensor values to the display once the camera is initialized.",
+      "tags": [
+        "lifecycle",
+        "display-rendering",
+        "esphome",
+        "polling"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_screen_",
+      "type": "function",
+      "name": "draw_screen_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        57,
+        73
+      ],
+      "summary": "Paints the static screen scaffold (title, section layout) and delegates to the sensor-data and alerts drawing routines.",
+      "tags": [
+        "display-rendering",
+        "ui",
+        "esphome",
+        "layout"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_sensor_data_",
+      "type": "function",
+      "name": "draw_sensor_data_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        75,
+        178
+      ],
+      "summary": "Renders the labeled CO2, temperature, humidity, and VPD readout block with color-coded values, handling unavailable sensor states.",
+      "tags": [
+        "display-rendering",
+        "ui",
+        "sensor",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_thermal_data_",
+      "type": "function",
+      "name": "draw_thermal_data_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        180,
+        255
+      ],
+      "summary": "Renders thermal statistics (min/max/avg, median) sourced from the MLX90640 component as a textual panel.",
+      "tags": [
+        "display-rendering",
+        "thermal-imaging",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_alerts_",
+      "type": "function",
+      "name": "draw_alerts_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        257,
+        388
+      ],
+      "summary": "Draws the alert panel, mapping temperature/humidity high-low alert binary sensor states to color-coded status lines.",
+      "tags": [
+        "display-rendering",
+        "alerting",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:get_status_color_",
+      "type": "function",
+      "name": "get_status_color_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        397,
+        432
+      ],
+      "summary": "Computes a display color reflecting overall environmental health from CO2, temperature, and humidity readings.",
+      "tags": [
+        "utility",
+        "display-rendering",
+        "status",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_thermal_image_",
+      "type": "function",
+      "name": "draw_thermal_image_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        436,
+        562
+      ],
+      "summary": "Renders the interpolated MLX90640 thermal frame to the display as a color-mapped image with a temperature scale, then overlays ROI markers.",
+      "tags": [
+        "thermal-imaging",
+        "display-rendering",
+        "esphome",
+        "visualization"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_roi_overlay_",
+      "type": "function",
+      "name": "draw_roi_overlay_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        564,
+        599
+      ],
+      "summary": "Draws the region-of-interest rectangle and crosshair over the thermal image using bounds queried from the MLX90640 component.",
+      "tags": [
+        "thermal-imaging",
+        "display-rendering",
+        "roi",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:check_and_update_sensor_values_",
+      "type": "function",
+      "name": "check_and_update_sensor_values_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        602,
+        678
+      ],
+      "summary": "Compares current sensor readings against cached values and triggers targeted partial redraws only when a value has meaningfully changed.",
+      "tags": [
+        "sensor",
+        "display-rendering",
+        "change-detection",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_co2_value_",
+      "type": "function",
+      "name": "draw_co2_value_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        680,
+        702
+      ],
+      "summary": "Repaints only the CO2 value region with a color reflecting the concentration band.",
+      "tags": [
+        "display-rendering",
+        "sensor",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_temperature_value_",
+      "type": "function",
+      "name": "draw_temperature_value_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        704,
+        737
+      ],
+      "summary": "Repaints only the temperature value region with color coding driven by alert thresholds.",
+      "tags": [
+        "display-rendering",
+        "sensor",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_humidity_value_",
+      "type": "function",
+      "name": "draw_humidity_value_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        739,
+        775
+      ],
+      "summary": "Repaints only the humidity value region with color coding driven by alert thresholds.",
+      "tags": [
+        "display-rendering",
+        "sensor",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_vpd_value_",
+      "type": "function",
+      "name": "draw_vpd_value_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        777,
+        799
+      ],
+      "summary": "Repaints only the vapor-pressure-deficit value region, recomputing VPD from current temperature and humidity.",
+      "tags": [
+        "display-rendering",
+        "vpd",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_light_status_",
+      "type": "function",
+      "name": "draw_light_status_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        801,
+        821
+      ],
+      "summary": "Repaints only the light status region based on the light sensor state.",
+      "tags": [
+        "display-rendering",
+        "sensor",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:grow_env_monitor/grow_env_monitor.cpp:draw_thermal_values_",
+      "type": "function",
+      "name": "draw_thermal_values_",
+      "filePath": "grow_env_monitor/grow_env_monitor.cpp",
+      "lineRange": [
+        823,
+        868
+      ],
+      "summary": "Repaints the thermal min/max/avg statistic region from the latest MLX90640 frame.",
+      "tags": [
+        "display-rendering",
+        "thermal-imaging",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:grow_env_monitor/grow_env_monitor.h",
+      "type": "file",
+      "name": "grow_env_monitor.h",
+      "filePath": "grow_env_monitor/grow_env_monitor.h",
+      "summary": "Header declaring the GrowEnvMonitor ESPHome component, its many sensor/display setter injection points, and private drawing helper methods.",
+      "tags": [
+        "type-definition",
+        "component",
+        "esphome",
+        "sensor-aggregation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:grow_env_monitor/grow_env_monitor.h:GrowEnvMonitor",
+      "type": "class",
+      "name": "GrowEnvMonitor",
+      "filePath": "grow_env_monitor/grow_env_monitor.h",
+      "lineRange": [
+        12,
+        106
+      ],
+      "summary": "ESPHome Component aggregating CO2/temperature/humidity/thermal/light sensors and alert states, rendering them plus a live thermal image to the CoreS3 display.",
+      "tags": [
+        "component",
+        "sensor-aggregation",
+        "display-rendering",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:m5cores3_display/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "m5cores3_display/__init__.py",
+      "summary": "ESPHome codegen entry point for the m5cores3_display component, registering the display peripheral and wiring its CO2L and MLX90640 thermal sources.",
+      "tags": [
+        "entry-point",
+        "codegen",
+        "esphome",
+        "display"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:m5cores3_display/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "m5cores3_display/__init__.py",
+      "lineRange": [
+        29,
+        39
+      ],
+      "summary": "Creates the M5CoreS3Display C++ instance and injects the configured CO2L and thermal-camera component references.",
+      "tags": [
+        "codegen",
+        "configuration",
+        "esphome",
+        "dependency-wiring"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:m5cores3_display/m5cores3_display.cpp",
+      "type": "file",
+      "name": "m5cores3_display.cpp",
+      "filePath": "m5cores3_display/m5cores3_display.cpp",
+      "summary": "Runtime implementation of the standalone CoreS3 display component, rendering environmental data and a color-mapped MLX90640 thermal image to the built-in screen.",
+      "tags": [
+        "display-rendering",
+        "thermal-imaging",
+        "esphome",
+        "ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:m5cores3_display/m5cores3_display.cpp:setup",
+      "type": "function",
+      "name": "setup",
+      "filePath": "m5cores3_display/m5cores3_display.cpp",
+      "lineRange": [
+        35,
+        49
+      ],
+      "summary": "Initializes the CoreS3 display hardware and paints the initial static layout.",
+      "tags": [
+        "lifecycle",
+        "display-rendering",
+        "esphome",
+        "initialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:m5cores3_display/m5cores3_display.cpp:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "m5cores3_display/m5cores3_display.cpp",
+      "lineRange": [
+        51,
+        82
+      ],
+      "summary": "Periodically refreshes the environmental readout and thermal camera panels from the attached sensor components.",
+      "tags": [
+        "lifecycle",
+        "display-rendering",
+        "esphome",
+        "polling"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_display/m5cores3_display.cpp:draw_environmental_data_",
+      "type": "function",
+      "name": "draw_environmental_data_",
+      "filePath": "m5cores3_display/m5cores3_display.cpp",
+      "lineRange": [
+        84,
+        168
+      ],
+      "summary": "Renders the CO2/temperature/humidity environmental data block read from the M5UnitCO2L sensor.",
+      "tags": [
+        "display-rendering",
+        "sensor",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:m5cores3_display/m5cores3_display.cpp:draw_thermal_camera_",
+      "type": "function",
+      "name": "draw_thermal_camera_",
+      "filePath": "m5cores3_display/m5cores3_display.cpp",
+      "lineRange": [
+        170,
+        201
+      ],
+      "summary": "Draws the thermal camera panel header and statistics, delegating pixel rendering to draw_thermal_image_.",
+      "tags": [
+        "display-rendering",
+        "thermal-imaging",
+        "ui",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:m5cores3_display/m5cores3_display.cpp:draw_thermal_image_",
+      "type": "function",
+      "name": "draw_thermal_image_",
+      "filePath": "m5cores3_display/m5cores3_display.cpp",
+      "lineRange": [
+        203,
+        267
+      ],
+      "summary": "Maps interpolated MLX90640 pixels to colors and blits the thermal image grid to the display.",
+      "tags": [
+        "thermal-imaging",
+        "display-rendering",
+        "visualization",
+        "esphome"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "type": "file",
+      "name": "scd4x_alerts.cpp",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "summary": "Implements the SCD4xAlerts ESPHome component, evaluating CO2, temperature, humidity, and VPD readings against configurable high/low thresholds and publishing debounced binary alert states.",
+      "tags": [
+        "component",
+        "event-handler",
+        "validation",
+        "sensor",
+        "esphome"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "ESPHome Component subclass; alert evaluation runs on a fixed UPDATE_INTERVAL inside loop() with per-metric debounce delays."
+    },
+    {
+      "id": "file:scd4x_alerts/scd4x_alerts.h",
+      "type": "file",
+      "name": "scd4x_alerts.h",
+      "filePath": "scd4x_alerts/scd4x_alerts.h",
+      "summary": "Header declaring the SCD4xAlerts component class with sensor inputs, threshold setters, binary alert sensor outputs, and per-metric debounce state.",
+      "tags": [
+        "component",
+        "type-definition",
+        "sensor",
+        "esphome",
+        "header"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Header-only setters; threshold values can come from either static config or runtime Number entities (number_ members)."
+    },
+    {
+      "id": "file:scd4x_stats/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "scd4x_stats/__init__.py",
+      "summary": "ESPHome codegen entry point for the scd4x_stats component, defining the config schema and to_code() that instantiates SCD4xStats and wires up VPD, daily-stat, and moving-average sensors.",
+      "tags": [
+        "entry-point",
+        "config",
+        "code-generation",
+        "esphome",
+        "schema"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "ESPHome Python codegen: builds a CONFIG_SCHEMA and emits C++ via cg.add/new_Pvariable; the VPD sensor schema pins accuracy_decimals=2 for kPa precision."
+    },
+    {
+      "id": "document:scd4x_stats/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "scd4x_stats/README.md",
+      "summary": "Documentation for the scd4x_stats component covering features, dependencies, YAML configuration, VPD/moving-average/daily-stat technical details, example use cases, and troubleshooting.",
+      "tags": [
+        "documentation",
+        "configuration",
+        "esphome",
+        "overview"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scd4x_stats/scd4x_stats.cpp",
+      "type": "file",
+      "name": "scd4x_stats.cpp",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "summary": "Implements the SCD4xStats ESPHome component, deriving VPD from temperature/humidity and maintaining daily min/max CO2/temp and CO2/temp moving averages with midnight-triggered daily resets.",
+      "tags": [
+        "component",
+        "service",
+        "data-model",
+        "sensor",
+        "esphome"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Uses a time component to detect midnight for daily-stat resets; moving averages use a fixed-size circular buffer (MOVING_AVG_SAMPLES)."
+    },
+    {
+      "id": "file:scd4x_stats/scd4x_stats.h",
+      "type": "file",
+      "name": "scd4x_stats.h",
+      "filePath": "scd4x_stats/scd4x_stats.h",
+      "summary": "Header declaring the SCD4xStats component class with source sensor inputs, time component, derived sensor outputs (VPD, daily extremes, moving averages), and the buffers/state backing those statistics.",
+      "tags": [
+        "component",
+        "type-definition",
+        "sensor",
+        "esphome",
+        "header"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:scd4x_alerts/scd4x_alerts.h:SCD4xAlerts",
+      "type": "class",
+      "name": "SCD4xAlerts",
+      "filePath": "scd4x_alerts/scd4x_alerts.h",
+      "lineRange": [
+        11,
+        127
+      ],
+      "summary": "ESPHome Component subclass that watches SCD4x-derived CO2/temperature/humidity/VPD sensors and drives high/low binary alert outputs based on configurable thresholds with per-metric debounce delays.",
+      "tags": [
+        "component",
+        "event-handler",
+        "validation",
+        "sensor"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Large setter surface (sensors, thresholds, alert outputs, threshold Number entities) plus parallel last_state_/last_change_ debounce state per metric."
+    },
+    {
+      "id": "class:scd4x_stats/scd4x_stats.h:SCD4xStats",
+      "type": "class",
+      "name": "SCD4xStats",
+      "filePath": "scd4x_stats/scd4x_stats.h",
+      "lineRange": [
+        10,
+        75
+      ],
+      "summary": "ESPHome Component subclass that computes derived SCD4x statistics: vapor pressure deficit, daily CO2/temperature extremes, and CO2/temperature moving averages reset at midnight via a time component.",
+      "tags": [
+        "component",
+        "data-model",
+        "service",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scd4x_alerts/scd4x_alerts.cpp:update_alerts_",
+      "type": "function",
+      "name": "update_alerts_",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "lineRange": [
+        45,
+        76
+      ],
+      "summary": "Reads current sensor states and dispatches to the per-metric alert evaluators for CO2, temperature, humidity, and VPD.",
+      "tags": [
+        "event-handler",
+        "dispatch",
+        "sensor"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scd4x_alerts/scd4x_alerts.cpp:update_co2_alerts_",
+      "type": "function",
+      "name": "update_co2_alerts_",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "lineRange": [
+        78,
+        97
+      ],
+      "summary": "Evaluates the CO2 reading against high and low thresholds and publishes the debounced high/low alert sensor states.",
+      "tags": [
+        "event-handler",
+        "validation",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_alerts/scd4x_alerts.cpp:update_temperature_alerts_",
+      "type": "function",
+      "name": "update_temperature_alerts_",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "lineRange": [
+        99,
+        120
+      ],
+      "summary": "Evaluates the temperature reading against high and low thresholds and publishes the debounced temperature alert sensor states.",
+      "tags": [
+        "event-handler",
+        "validation",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_alerts/scd4x_alerts.cpp:update_humidity_alerts_",
+      "type": "function",
+      "name": "update_humidity_alerts_",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "lineRange": [
+        122,
+        143
+      ],
+      "summary": "Evaluates the humidity reading against high and low thresholds and publishes the debounced humidity alert sensor states.",
+      "tags": [
+        "event-handler",
+        "validation",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_alerts/scd4x_alerts.cpp:update_vpd_alerts_",
+      "type": "function",
+      "name": "update_vpd_alerts_",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "lineRange": [
+        145,
+        164
+      ],
+      "summary": "Evaluates the VPD reading against high and low thresholds and publishes the debounced VPD alert sensor states.",
+      "tags": [
+        "event-handler",
+        "validation",
+        "sensor"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_alerts/scd4x_alerts.cpp:check_alert_with_delay_",
+      "type": "function",
+      "name": "check_alert_with_delay_",
+      "filePath": "scd4x_alerts/scd4x_alerts.cpp",
+      "lineRange": [
+        166,
+        182
+      ],
+      "summary": "Debounce helper that only returns an active alert once the threshold condition has held stable for the configured delay, suppressing transient threshold crossings.",
+      "tags": [
+        "utility",
+        "validation",
+        "debounce"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_stats/__init__.py:vpd_sensor_schema",
+      "type": "function",
+      "name": "vpd_sensor_schema",
+      "filePath": "scd4x_stats/__init__.py",
+      "lineRange": [
+        28,
+        38
+      ],
+      "summary": "Builds the ESPHome sensor schema for the VPD output, fixing the unit to kPa and accuracy to two decimals for precise vapor pressure deficit reporting.",
+      "tags": [
+        "schema",
+        "config",
+        "factory"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_stats/__init__.py:to_code",
+      "type": "function",
+      "name": "to_code",
+      "filePath": "scd4x_stats/__init__.py",
+      "lineRange": [
+        58,
+        105
+      ],
+      "summary": "ESPHome codegen routine that instantiates the SCD4xStats component, resolves and binds source sensors plus the time component, and registers each optional derived-statistic sensor.",
+      "tags": [
+        "code-generation",
+        "entry-point",
+        "config"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:setup",
+      "type": "function",
+      "name": "setup",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        11,
+        27
+      ],
+      "summary": "Initializes the SCD4xStats component, logging configuration and preparing the moving-average buffers and timing state at boot.",
+      "tags": [
+        "lifecycle",
+        "initialization",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:loop",
+      "type": "function",
+      "name": "loop",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        29,
+        48
+      ],
+      "summary": "Main run loop that triggers midnight daily-stat resets, periodic moving-average updates, and interval-based sensor recomputation.",
+      "tags": [
+        "lifecycle",
+        "event-handler",
+        "esphome"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:update_vpd_",
+      "type": "function",
+      "name": "update_vpd_",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        65,
+        78
+      ],
+      "summary": "Computes the vapor pressure deficit from current temperature and humidity and publishes it to the VPD sensor when valid.",
+      "tags": [
+        "sensor",
+        "computation",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:update_daily_stats_",
+      "type": "function",
+      "name": "update_daily_stats_",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        80,
+        108
+      ],
+      "summary": "Tracks and publishes daily maximum CO2 and daily minimum/maximum temperature, updating the running extremes from current sensor readings.",
+      "tags": [
+        "sensor",
+        "data-model",
+        "statistics"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:update_moving_averages_",
+      "type": "function",
+      "name": "update_moving_averages_",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        110,
+        135
+      ],
+      "summary": "Maintains fixed-window moving averages for CO2 and temperature using a circular sample buffer and publishes the averaged values.",
+      "tags": [
+        "sensor",
+        "statistics",
+        "computation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:reset_daily_stats_",
+      "type": "function",
+      "name": "reset_daily_stats_",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        137,
+        151
+      ],
+      "summary": "Clears the accumulated daily CO2/temperature extremes and records the current day so resets fire once per day at midnight.",
+      "tags": [
+        "statistics",
+        "state-reset",
+        "lifecycle"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:calculate_vpd_",
+      "type": "function",
+      "name": "calculate_vpd_",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        153,
+        165
+      ],
+      "summary": "Computes vapor pressure deficit in kPa from temperature and relative humidity using the saturation vapor pressure formula, returning NAN for invalid inputs.",
+      "tags": [
+        "utility",
+        "computation",
+        "validation"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Implements SVP = 0.6108 * exp((17.27*T)/(T+237.3)); VPD = SVP * (1 - RH/100)."
+    },
+    {
+      "id": "function:scd4x_stats/scd4x_stats.cpp:is_midnight_",
+      "type": "function",
+      "name": "is_midnight_",
+      "filePath": "scd4x_stats/scd4x_stats.cpp",
+      "lineRange": [
+        167,
+        181
+      ],
+      "summary": "Returns true at 00:00 once per day using the configured time component, guarding daily-stat resets against repeated firing.",
+      "tags": [
+        "utility",
+        "validation",
+        "time"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "file:ezo_types/ezo_types.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "file:ezo_types/select.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "file:ezo_types/switch.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/select.cpp",
+      "target": "file:ezo_types/ezo_types.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/select.cpp",
+      "target": "file:ezo_types/select.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/switch.cpp",
+      "target": "file:ezo_types/ezo_types.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/switch.cpp",
+      "target": "file:ezo_types/switch.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:PHSensor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:ECSensor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:RTDSensor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:ORPSensor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:TDSConversionFactorNumber",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/select.h",
+      "target": "class:ezo_types/select.h:CellConstantSelect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/switch.h",
+      "target": "class:ezo_types/switch.h:ExtendedScaleSwitch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:update_diagnostic_sensors_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_reading_csv_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_slope_response_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_common_status_response_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_cell_constant_response_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:send_compensated_read_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:check_temperature_change_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_device_information_response_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:dump_config_base_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_extended_scale_response_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:handle_common_responses_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.cpp",
+      "target": "function:ezo_types/ezo_types.cpp:parse_tds_response_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:PHSensor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:ECSensor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:RTDSensor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:ORPSensor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/ezo_types.h",
+      "target": "class:ezo_types/ezo_types.h:TDSConversionFactorNumber",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/select.h",
+      "target": "class:ezo_types/select.h:CellConstantSelect",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/switch.h",
+      "target": "class:ezo_types/switch.h:ExtendedScaleSwitch",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:ezo_types/ezo_types.h:PHSensor",
+      "target": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "class:ezo_types/ezo_types.h:ECSensor",
+      "target": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "class:ezo_types/ezo_types.h:RTDSensor",
+      "target": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "class:ezo_types/ezo_types.h:ORPSensor",
+      "target": "class:ezo_types/ezo_types.h:EZOSensor",
+      "type": "inherits",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "class:ezo_types/select.h:CellConstantSelect",
+      "target": "class:ezo_types/ezo_types.h:ECSensor",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:ezo_types/switch.h:ExtendedScaleSwitch",
+      "target": "class:ezo_types/ezo_types.h:ORPSensor",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:ezo_types/ezo_types.h:TDSConversionFactorNumber",
+      "target": "class:ezo_types/ezo_types.h:ECSensor",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:ezo_types/ezo_types.h:EZOSensor",
+      "target": "class:ezo_types/ezo_types.h:RTDSensor",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "file:mlx90640/MLX90640_API.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "file:mlx90640/MLX90640_I2C_Driver.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "file:mlx90640/MLX90640_I2C_Driver.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "file:mlx90640/mlx90640.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "file:mlx90640/MLX90640_API.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "file:mlx90640/MLX90640_I2C_Driver.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SynchFrame",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_TriggerMeasurement",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetFrameData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_ExtractParameters",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_CalculateTo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetImage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetVdd",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetTa",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_BadPixelsCorrection",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetRefreshRate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetResolution",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetChessMode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:ExtractAlphaParameters",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:ExtractDeviatingPixels",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CRead",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CGeneralReset",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:setup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:setup_thermal_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:calculate_roi_bounds_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:process_roi_temperatures_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:interpolate_image_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:temp_to_color",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:set_active_palette_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:get_roi_overlay_bounds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:sync_roi_state_from_controls",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:control",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:write_state",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:setup_web_server_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:handle_thermal_image_request_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:handle_thermal_page_request_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:generate_jpg_jpegenc_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:add_roi_overlay_to_image_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.cpp",
+      "target": "function:mlx90640/mlx90640.cpp:add_temperature_text_to_image_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:ROIConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Component",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Number",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Select",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Switch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SynchFrame",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_TriggerMeasurement",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetFrameData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_ExtractParameters",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_CalculateTo",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetImage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetVdd",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetTa",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_BadPixelsCorrection",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetRefreshRate",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetResolution",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_API.cpp",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetChessMode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CRead",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/MLX90640_I2C_Driver.cpp",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CGeneralReset",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:ROIConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Component",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Number",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Select",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/mlx90640.h",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Switch",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_SynchFrame",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_SynchFrame",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CRead",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_TriggerMeasurement",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CRead",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_TriggerMeasurement",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_TriggerMeasurement",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CGeneralReset",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetFrameData",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CRead",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetFrameData",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetRefreshRate",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetResolution",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetChessMode",
+      "target": "function:mlx90640/MLX90640_I2C_Driver.cpp:MLX90640_I2CWrite",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup_thermal_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_ExtractParameters",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup_thermal_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SetRefreshRate",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_SynchFrame",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetFrameData",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetVdd",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_GetTa",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_CalculateTo",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/MLX90640_API.cpp:MLX90640_BadPixelsCorrection",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup",
+      "target": "function:mlx90640/mlx90640.cpp:setup_thermal_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup",
+      "target": "function:mlx90640/mlx90640.cpp:set_active_palette_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup",
+      "target": "function:mlx90640/mlx90640.cpp:setup_web_server_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup",
+      "target": "function:mlx90640/mlx90640.cpp:sync_roi_state_from_controls",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/mlx90640.cpp:interpolate_image_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:update_thermal_data_",
+      "target": "function:mlx90640/mlx90640.cpp:process_roi_temperatures_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:process_roi_temperatures_",
+      "target": "function:mlx90640/mlx90640.cpp:calculate_roi_bounds_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:get_roi_overlay_bounds",
+      "target": "function:mlx90640/mlx90640.cpp:calculate_roi_bounds_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup_web_server_",
+      "target": "function:mlx90640/mlx90640.cpp:handle_thermal_image_request_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:setup_web_server_",
+      "target": "function:mlx90640/mlx90640.cpp:handle_thermal_page_request_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:handle_thermal_image_request_",
+      "target": "function:mlx90640/mlx90640.cpp:generate_jpg_jpegenc_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:generate_jpg_jpegenc_",
+      "target": "function:mlx90640/mlx90640.cpp:temp_to_color",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:generate_jpg_jpegenc_",
+      "target": "function:mlx90640/mlx90640.cpp:add_roi_overlay_to_image_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:generate_jpg_jpegenc_",
+      "target": "function:mlx90640/mlx90640.cpp:add_temperature_text_to_image_",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:mlx90640/mlx90640.cpp:add_roi_overlay_to_image_",
+      "target": "function:mlx90640/mlx90640.cpp:get_roi_overlay_bounds",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:mlx90640/mlx90640.h:MLX90640Number",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Component",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:mlx90640/mlx90640.h:MLX90640Select",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Component",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "class:mlx90640/mlx90640.h:MLX90640Switch",
+      "target": "class:mlx90640/mlx90640.h:MLX90640Component",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:ezo_types/sensor.py",
+      "target": "file:ezo_types/select.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/sensor.py",
+      "target": "file:ezo_types/switch.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:ezo_types/sensor.py",
+      "target": "function:ezo_types/sensor.py:setup_atlas_sensor_base",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/sensor.py",
+      "target": "function:ezo_types/sensor.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:ezo_types/sensor.py",
+      "target": "function:ezo_types/sensor.py:setup_atlas_sensor_base",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:ezo_types/sensor.py",
+      "target": "function:ezo_types/sensor.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:ezo_types/sensor.py:to_code",
+      "target": "function:ezo_types/sensor.py:setup_atlas_sensor_base",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.h",
+      "target": "class:m5cores3_display/m5cores3_display.h:M5CoreS3Display",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.h",
+      "target": "class:m5cores3_display/m5cores3_display.h:M5CoreS3Display",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_power/__init__.py",
+      "target": "function:m5cores3_power/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_power/__init__.py",
+      "target": "function:m5cores3_power/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_power/m5cores3_power.cpp",
+      "target": "file:m5cores3_power/m5cores3_power.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:m5cores3_power/m5cores3_power.cpp",
+      "target": "function:m5cores3_power/m5cores3_power.cpp:log_axp2101_diagnostics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_power/m5cores3_power.cpp",
+      "target": "function:m5cores3_power/m5cores3_power.cpp:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_power/m5cores3_power.cpp",
+      "target": "function:m5cores3_power/m5cores3_power.cpp:dump_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_power/m5cores3_power.h",
+      "target": "class:m5cores3_power/m5cores3_power.h:M5CoreS3Power",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_power/m5cores3_power.h",
+      "target": "class:m5cores3_power/m5cores3_power.h:M5CoreS3Power",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_touch/__init__.py",
+      "target": "function:m5cores3_touch/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_touch/__init__.py",
+      "target": "function:m5cores3_touch/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_touch/m5cores3_touch.cpp",
+      "target": "file:m5cores3_touch/m5cores3_touch.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:m5cores3_touch/m5cores3_touch.cpp",
+      "target": "function:m5cores3_touch/m5cores3_touch.cpp:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_touch/m5cores3_touch.h",
+      "target": "class:m5cores3_touch/m5cores3_touch.h:M5CoreS3Touch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_touch/m5cores3_touch.h",
+      "target": "class:m5cores3_touch/m5cores3_touch.h:M5CoreS3Touch",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:mlx90640/__init__.py",
+      "target": "function:mlx90640/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:mlx90640/__init__.py",
+      "target": "function:mlx90640/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:mlx90640/example.yaml",
+      "target": "file:mlx90640/__init__.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:mlx90640/README.md",
+      "target": "file:mlx90640/__init__.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:mlx90640/README.md",
+      "target": "config:mlx90640/example.yaml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scd4x_alerts/__init__.py",
+      "target": "function:scd4x_alerts/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/__init__.py",
+      "target": "function:scd4x_alerts/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "document:scd4x_alerts/README.md",
+      "target": "file:scd4x_alerts/__init__.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:board_m5cores3/board_m5cores3.cpp",
+      "target": "file:board_m5cores3/board_m5cores3.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:board_m5cores3/board_m5cores3.cpp",
+      "target": "function:board_m5cores3/board_m5cores3.cpp:setup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:board_m5cores3/board_m5cores3.h",
+      "target": "class:board_m5cores3/board_m5cores3.h:BoardM5CoreS3",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:board_m5cores3/board_m5cores3.h",
+      "target": "class:board_m5cores3/board_m5cores3.h:BoardM5CoreS3",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:docker/esphome",
+      "target": "config:docker/esphome-dev.yml",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:ezo_types/README.md",
+      "target": "file:ezo_types/__init__.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:ezo_types/README.md",
+      "target": "file:ezo_types/number.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:grow_env_monitor/__init__.py",
+      "target": "function:grow_env_monitor/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/__init__.py",
+      "target": "function:grow_env_monitor/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "file:grow_env_monitor/grow_env_monitor.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:setup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_screen_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_sensor_data_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_thermal_data_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_alerts_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:get_status_color_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_thermal_image_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_roi_overlay_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:check_and_update_sensor_values_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_co2_value_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_temperature_value_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_humidity_value_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_vpd_value_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_light_status_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.cpp",
+      "target": "function:grow_env_monitor/grow_env_monitor.cpp:draw_thermal_values_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.h",
+      "target": "class:grow_env_monitor/grow_env_monitor.h:GrowEnvMonitor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:grow_env_monitor/grow_env_monitor.h",
+      "target": "class:grow_env_monitor/grow_env_monitor.h:GrowEnvMonitor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_display/__init__.py",
+      "target": "function:m5cores3_display/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_display/__init__.py",
+      "target": "function:m5cores3_display/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.cpp",
+      "target": "file:m5cores3_display/m5cores3_display.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.cpp",
+      "target": "function:m5cores3_display/m5cores3_display.cpp:setup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.cpp",
+      "target": "function:m5cores3_display/m5cores3_display.cpp:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.cpp",
+      "target": "function:m5cores3_display/m5cores3_display.cpp:draw_environmental_data_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.cpp",
+      "target": "function:m5cores3_display/m5cores3_display.cpp:draw_thermal_camera_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:m5cores3_display/m5cores3_display.cpp",
+      "target": "function:m5cores3_display/m5cores3_display.cpp:draw_thermal_image_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "file:scd4x_alerts/scd4x_alerts.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "file:scd4x_stats/scd4x_stats.h",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.h",
+      "target": "class:scd4x_alerts/scd4x_alerts.h:SCD4xAlerts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.h",
+      "target": "class:scd4x_alerts/scd4x_alerts.h:SCD4xAlerts",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.h",
+      "target": "class:scd4x_stats/scd4x_stats.h:SCD4xStats",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.h",
+      "target": "class:scd4x_stats/scd4x_stats.h:SCD4xStats",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "function:scd4x_alerts/scd4x_alerts.cpp:update_alerts_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "function:scd4x_alerts/scd4x_alerts.cpp:update_co2_alerts_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "function:scd4x_alerts/scd4x_alerts.cpp:update_temperature_alerts_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "function:scd4x_alerts/scd4x_alerts.cpp:update_humidity_alerts_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "function:scd4x_alerts/scd4x_alerts.cpp:update_vpd_alerts_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_alerts/scd4x_alerts.cpp",
+      "target": "function:scd4x_alerts/scd4x_alerts.cpp:check_alert_with_delay_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/__init__.py",
+      "target": "function:scd4x_stats/__init__.py:vpd_sensor_schema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/__init__.py",
+      "target": "function:scd4x_stats/__init__.py:to_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/__init__.py",
+      "target": "function:scd4x_stats/__init__.py:to_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scd4x_stats/__init__.py",
+      "target": "function:scd4x_stats/__init__.py:vpd_sensor_schema",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:setup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:loop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:update_vpd_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:update_daily_stats_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:update_moving_averages_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:reset_daily_stats_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:calculate_vpd_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/scd4x_stats.cpp",
+      "target": "function:scd4x_stats/scd4x_stats.cpp:is_midnight_",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scd4x_stats/__init__.py",
+      "target": "file:scd4x_stats/scd4x_stats.h",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:scd4x_stats/README.md",
+      "target": "file:scd4x_stats/__init__.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:scd4x_stats/README.md",
+      "target": "file:scd4x_stats/scd4x_stats.h",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:codegen",
+      "name": "Python Codegen & Configuration Schema",
+      "description": "ESPHome Python codegen for every component: package __init__.py entry points and the sensor/select/number/switch platform modules that define each component's CONFIG_SCHEMA and emit the C++ wiring via to_code().",
+      "nodeIds": [
+        "file:ezo_types/__init__.py",
+        "file:ezo_types/sensor.py",
+        "file:ezo_types/select.py",
+        "file:ezo_types/switch.py",
+        "file:ezo_types/number.py",
+        "file:mlx90640/__init__.py",
+        "file:scd4x_stats/__init__.py",
+        "file:scd4x_alerts/__init__.py",
+        "file:grow_env_monitor/__init__.py",
+        "file:board_m5cores3/__init__.py",
+        "file:m5cores3_display/__init__.py",
+        "file:m5cores3_power/__init__.py",
+        "file:m5cores3_touch/__init__.py"
+      ]
+    },
+    {
+      "id": "layer:firmware",
+      "name": "C++ Firmware & Runtime",
+      "description": "On-device C++ implementations and headers for each ESPHome component: EZO probe handling, SCD4x stats/alerts, MLX90640 thermal polling and web serving, the grow_env_monitor and m5cores3 display/power/touch peripherals, and CoreS3 board bring-up.",
+      "nodeIds": [
+        "file:ezo_types/ezo_types.cpp",
+        "file:ezo_types/ezo_types.h",
+        "file:ezo_types/select.cpp",
+        "file:ezo_types/select.h",
+        "file:ezo_types/switch.cpp",
+        "file:ezo_types/switch.h",
+        "file:mlx90640/mlx90640.cpp",
+        "file:mlx90640/mlx90640.h",
+        "file:scd4x_stats/scd4x_stats.cpp",
+        "file:scd4x_stats/scd4x_stats.h",
+        "file:scd4x_alerts/scd4x_alerts.cpp",
+        "file:scd4x_alerts/scd4x_alerts.h",
+        "file:grow_env_monitor/grow_env_monitor.cpp",
+        "file:grow_env_monitor/grow_env_monitor.h",
+        "file:m5cores3_display/m5cores3_display.cpp",
+        "file:m5cores3_display/m5cores3_display.h",
+        "file:m5cores3_power/m5cores3_power.cpp",
+        "file:m5cores3_power/m5cores3_power.h",
+        "file:m5cores3_touch/m5cores3_touch.cpp",
+        "file:m5cores3_touch/m5cores3_touch.h",
+        "file:board_m5cores3/board_m5cores3.cpp",
+        "file:board_m5cores3/board_m5cores3.h"
+      ]
+    },
+    {
+      "id": "layer:vendored-drivers",
+      "name": "Vendored Drivers",
+      "description": "Third-party Melexis MLX90640 driver code (frame acquisition, EEPROM calibration, temperature calculation) plus the I2C transport shim that adapts it onto an ESPHome i2c::I2CBus.",
+      "nodeIds": [
+        "file:mlx90640/MLX90640_API.cpp",
+        "file:mlx90640/MLX90640_API.h",
+        "file:mlx90640/MLX90640_I2C_Driver.cpp",
+        "file:mlx90640/MLX90640_I2C_Driver.h"
+      ]
+    },
+    {
+      "id": "layer:documentation",
+      "name": "Documentation",
+      "description": "Per-component README configuration references covering MLX90640 thermal camera, SCD4x stats and alerts, and Atlas Scientific EZO sensor setup, usage, and troubleshooting.",
+      "nodeIds": [
+        "document:mlx90640/README.md",
+        "document:scd4x_stats/README.md",
+        "document:scd4x_alerts/README.md",
+        "document:ezo_types/README.md"
+      ]
+    },
+    {
+      "id": "layer:tooling",
+      "name": "Build & Dev Tooling",
+      "description": "Local development harness and example configuration: the Dockerized ESPHome dev container, its CLI wrapper script, and the standalone MLX90640 example device YAML.",
+      "nodeIds": [
+        "config:docker/esphome-dev.yml",
+        "file:docker/esphome",
+        "config:mlx90640/example.yaml"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "The Local Dev Loop",
+      "description": "Start where a contributor starts: the Dockerized ESPHome dev harness. esphome-dev.yml defines a Compose service that pins the ghcr.io/esphome/esphome image, mounts this repo at /config, and exposes USB plus host networking so you can build, flash, and OTA-update real hardware. The docker/esphome bash wrapper is the everyday entry point — it runs the ESPHome CLI inside that container against any scratch config or component example. There is no top-level README, so this tooling is how you actually exercise everything that follows.",
+      "nodeIds": [
+        "config:docker/esphome-dev.yml",
+        "file:docker/esphome"
+      ],
+      "languageLesson": "ESPHome itself is a build tool: it reads a device YAML, generates a PlatformIO C++ project, compiles it, and flashes the ESP32. Running it inside a container with the repo mounted at /config keeps the toolchain reproducible while still reaching USB, mDNS, and OTA on the host network."
+    },
+    {
+      "order": 2,
+      "title": "Consuming a Component",
+      "description": "Before dissecting how a component is built, see how a user pulls one in. This example device config wires the mlx90640 thermal camera onto an ESP32 over I2C and exposes its sensors. The key idiom is the external_components block, which points ESPHome at this repo so a custom component is loaded exactly like a built-in one. Every component in this monorepo is consumed through this same mechanism — real device firmware lives in a separate repo (grow-fleet) and references these components from here.",
+      "nodeIds": [
+        "config:mlx90640/example.yaml"
+      ],
+      "languageLesson": "ESPHome's `external_components:` key accepts a git or local source plus a component list. At codegen time ESPHome imports each named component's Python package (its __init__.py or platform module) to learn the config schema and generate C++ — the same loading path used for upstream components."
+    },
+    {
+      "order": 3,
+      "title": "The Codegen Layer",
+      "description": "Every component here has two layers; this step teaches the first using scd4x_stats, the cleanest exemplar (it derives VPD and daily/moving-average statistics from an SCD4x CO2 sensor). Begin with its README for the user-facing contract — what YAML keys exist and what each derived sensor means — then read __init__.py, the Python codegen entry point. The codegen defines a CONFIG_SCHEMA that validates user YAML and a to_code() function that emits the C++ wiring. Crucially, this Python never runs on the device: it runs on your build machine to generate firmware source.",
+      "nodeIds": [
+        "document:scd4x_stats/README.md",
+        "file:scd4x_stats/__init__.py"
+      ],
+      "languageLesson": "The ESPHome codegen idiom: CONFIG_SCHEMA (built on voluptuous) declares and validates options; to_code() is an async generator that calls cg.new_Pvariable() to instantiate the C++ class and emits setter calls like cg.add(var.set_co2_sensor(...)). Each `await ...` resolves a referenced ESPHome entity into a C++ pointer the generated code can hold."
+    },
+    {
+      "order": 4,
+      "title": "The C++ Firmware Layer",
+      "description": "Now the second layer of scd4x_stats: the on-device C++ that the codegen from Step 3 instantiated and wired. The header declares SCD4xStats with the setter injection points the Python called (source sensors, a time component, derived outputs) plus the buffers backing the statistics. The .cpp implements the actual behavior — calculating VPD from temperature and humidity, maintaining daily min/max and moving averages, and resetting at midnight. Together with Step 3 this is the complete external-component pattern that every other component repeats.",
+      "nodeIds": [
+        "file:scd4x_stats/scd4x_stats.h",
+        "file:scd4x_stats/scd4x_stats.cpp"
+      ],
+      "languageLesson": "ESPHome C++ components subclass Component (or PollingComponent) and implement setup() once and loop()/update() repeatedly. The public set_*() methods you see in the header are not user API — they are the exact injection points the Python to_code() emits, making the header and the codegen two halves of one contract."
+    },
+    {
+      "order": 5,
+      "title": "Threshold Alerting: scd4x_alerts",
+      "description": "With the pattern in hand, see it applied to a sibling concern. scd4x_alerts watches the same CO2, temperature, humidity, and VPD readings (including the VPD derived in Step 3) and raises debounced binary alerts when they cross configurable high/low thresholds. Read the README for the alerting model, then notice the codegen and C++ mirror the scd4x_stats structure exactly — only the entity types differ, emitting binary_sensor outputs and number controls instead of derived sensors. This is the payoff of a consistent pattern: a new component is mostly a new schema plus new runtime logic.",
+      "nodeIds": [
+        "document:scd4x_alerts/README.md",
+        "file:scd4x_alerts/__init__.py",
+        "file:scd4x_alerts/scd4x_alerts.cpp",
+        "file:scd4x_alerts/scd4x_alerts.h"
+      ],
+      "languageLesson": "Per-metric debounce (an alert must hold for a delay before publishing) is a common embedded-sensor idiom that avoids flapping on momentary spikes. Here it lives entirely in the C++ loop, while the thresholds are exposed as ESPHome number entities so they can be tuned at runtime without reflashing."
+    },
+    {
+      "order": 6,
+      "title": "Thermal Imaging: mlx90640",
+      "description": "The most elaborate component: an MLX90640 32x24 thermal camera. Its README covers quick start, ROI configuration, thermography parameters, color palettes, and an embedded web server. The codegen in __init__.py defines an unusually rich schema (hardware, temperature sensors, ROI, web server, runtime controls) and the C++ layer polls and calibrates frames, computes whole-frame and ROI statistics, bicubically upscales the image, and serves a self-contained thermal viewer page plus on-demand JPEG renders over HTTP. It shows how far the same two-layer pattern scales.",
+      "nodeIds": [
+        "document:mlx90640/README.md",
+        "file:mlx90640/__init__.py",
+        "file:mlx90640/mlx90640.h",
+        "file:mlx90640/mlx90640.cpp"
+      ],
+      "languageLesson": "MLX90640Component is a PollingComponent + I2CDevice, and its companion Number/Select/Switch classes are ESPHome control entities: codegen instantiates them and binds each back to the parent component, so adjusting ROI or palette in the UI calls into the running firmware. Serving an interactive web page directly from the ESP32 is a deliberate choice to make the camera self-contained with no external dashboard."
+    },
+    {
+      "order": 7,
+      "title": "Vendored Melexis Driver",
+      "description": "The mlx90640 component does not talk to the sensor directly — it delegates to third-party driver code from Melexis, kept here as a vendored layer. MLX90640_API handles frame acquisition, EEPROM calibration parsing, and the math that turns raw readings into per-pixel object temperatures, supply voltage, and ambient temperature. Because that upstream code expects its own I2C primitives, MLX90640_I2C_Driver is a thin shim that adapts those read/write/reset calls onto an injected ESPHome i2c::I2CBus. Recognizing this boundary matters: the API files are essentially untouched upstream code, while the shim is the integration seam this repo owns.",
+      "nodeIds": [
+        "file:mlx90640/MLX90640_API.cpp",
+        "file:mlx90640/MLX90640_API.h",
+        "file:mlx90640/MLX90640_I2C_Driver.cpp",
+        "file:mlx90640/MLX90640_I2C_Driver.h"
+      ],
+      "languageLesson": "Adapting vendored C drivers to a host framework via a transport shim is a standard embedded technique: keep the upstream algorithm code verbatim (easy to re-sync) and inject the platform's I2C bus behind the driver's fixed function signatures, rather than forking the driver to call ESPHome APIs directly."
+    },
+    {
+      "order": 8,
+      "title": "Liquid Chemistry: ezo_types",
+      "description": "ezo_types adds typed support for Atlas Scientific EZO circuits (pH, EC, RTD, ORP) and demonstrates a multi-platform component — more than just a sensor. Start with the README for probe configuration and temperature compensation, then read sensor.py, the main codegen that declares the full schema and emits C++ for each probe type plus its diagnostic and compensation sensors. The header reveals an EZOSensor base class extending ESPHome's upstream ezo component, with PHSensor/ECSensor/RTDSensor/ORPSensor specializations; the .cpp parses circuit responses and manages a power-gated I2C command queue with temperature-compensated reads.",
+      "nodeIds": [
+        "document:ezo_types/README.md",
+        "file:ezo_types/sensor.py",
+        "file:ezo_types/ezo_types.h",
+        "file:ezo_types/ezo_types.cpp"
+      ],
+      "languageLesson": "A multi-platform ESPHome component ships several platform modules (sensor.py, select.py, switch.py, number.py) under one package, each registering entities that attach to the same C++ object. The probe family uses classic C++ inheritance — one EZOSensor base with per-chemistry subclasses — so shared response parsing and the command queue live once in the base."
+    },
+    {
+      "order": 9,
+      "title": "CoreS3 Board & Peripherals",
+      "description": "These components provide M5Stack CoreS3 hardware support. board_m5cores3 is board-level bring-up: at setup it powers the AXP2101 PMIC, configures the AW9523 GPIO expander, and enables the display backlight — prerequisites before anything renders. The sibling peripheral components then expose discrete capabilities: m5cores3_power polls the PMIC for battery state, m5cores3_touch drives the touchscreen and fires touch/release automation triggers, and m5cores3_display renders environmental data and a color-mapped thermal image to the built-in screen. Each is an independent component you can adopt à la carte.",
+      "nodeIds": [
+        "file:board_m5cores3/__init__.py",
+        "file:board_m5cores3/board_m5cores3.cpp",
+        "file:m5cores3_power/m5cores3_power.cpp",
+        "file:m5cores3_touch/m5cores3_touch.cpp",
+        "file:m5cores3_display/m5cores3_display.cpp"
+      ],
+      "languageLesson": "Board bring-up ordering is load-bearing on integrated devices: the PMIC must supply rails and the I/O expander/backlight must be enabled before peripherals initialize, so this logic runs in setup() of a dedicated board component rather than being scattered across each peripheral."
+    },
+    {
+      "order": 10,
+      "title": "Integration: grow_env_monitor",
+      "description": "The capstone ties the catalog together. grow_env_monitor is the integrative component for grow/environmental monitoring: its codegen wires in the MLX90640 thermal camera (Steps 6-7), CO2/temperature/humidity readings with derived VPD (Steps 3-4), threshold alerts (Step 5), light status, and ROI statistics. The C++ renders all of it to the CoreS3 display (Step 9) — sensor values, VPD, alerts, and a live thermal image with ROI overlay — refreshing only changed values each loop to keep the screen responsive. Read it last to see how independent, single-purpose components compose into a complete device.",
+      "nodeIds": [
+        "file:grow_env_monitor/__init__.py",
+        "file:grow_env_monitor/grow_env_monitor.h",
+        "file:grow_env_monitor/grow_env_monitor.cpp"
+      ],
+      "languageLesson": "Composition here is pure dependency injection: grow_env_monitor owns no sensors itself: its to_code() resolves references to other components' entities and passes them in via setters. Redrawing only changed values each loop (dirty-checking) is the standard way to keep an embedded display smooth without flicker or wasted I2C/SPI traffic."
+    }
+  ]
+}
