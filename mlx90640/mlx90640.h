@@ -46,6 +46,11 @@ class MLX90640Component : public thermal_camera_core::ThermalCameraBase {
     reflected_temperature_auto_control_ = control;
   }
 
+  // Extends the base ROI/update_interval sync with the emissivity and
+  // reflected-temperature number controls (ThermalNumber::setup() restores the
+  // value but never pushes it into the parent).
+  void sync_roi_state_from_controls() override;
+
  protected:
   // Virtual seams from ThermalCameraBase
   bool read_frame_() override;

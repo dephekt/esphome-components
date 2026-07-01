@@ -208,6 +208,26 @@ int MLX90640Component::setup_thermal_pattern_(const std::string &pattern) {
   }
 }
 
+// State synchronization - sync the base ROI/update_interval controls, then the
+// device-specific thermography number controls.
+void MLX90640Component::sync_roi_state_from_controls() {
+  thermal_camera_core::ThermalCameraBase::sync_roi_state_from_controls();
+
+  // ThermalNumber::setup() only publish_state()s the restored value; it never
+  // calls control(). Pick up the restored emissivity / reflected-temperature
+  // here so a value restored from flash (or the YAML initial) actually drives
+  // MLX90640_CalculateTo, instead of the UI showing one value while the sensor
+  // keeps using the compile-time default.
+  if (emissivity_control_ != nullptr && !std::isnan(emissivity_control_->state)) {
+    emissivity_ = emissivity_control_->state;
+    ESP_LOGD(TAG, "Synced emissivity: %.3f", emissivity_);
+  }
+  if (reflected_temperature_control_ != nullptr && !std::isnan(reflected_temperature_control_->state)) {
+    reflected_temperature_ = reflected_temperature_control_->state;
+    ESP_LOGD(TAG, "Synced reflected temperature: %.1f°C", reflected_temperature_);
+  }
+}
+
 // Fall-through for device-specific numeric controls (emissivity, reflected temperature).
 void MLX90640Component::on_extra_number_control(int type, float value) {
   switch (type) {
