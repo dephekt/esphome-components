@@ -4,11 +4,18 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#ifdef USE_NETWORK
+#include <esp_heap_caps.h>
+#endif
 
 namespace esphome {
 namespace m5stack_thermal2 {
 
 static const char *const TAG = "m5stack_thermal2";
+
+// Shared validity filter for both whole-frame and ROI stats (keeps the bound in
+// one place). The Thermal2 conversion spans -64..447 °C; clamp to a usable band.
+static inline bool in_temp_range(float t) { return t > -40.0f && t < 300.0f; }
 
 void M5Thermal2Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up M5Stack Thermal2...");
@@ -46,7 +53,10 @@ void M5Thermal2Component::loop() {
   if (now - last_update_time_ >= update_interval_) {
     last_update_time_ = now;
     handle_button_();
-    if (read_frame_()) {
+    // Only publish stats / evaluate the alarm once a full frame (both subpages)
+    // has been captured, so a half-populated frame can't skew stats or trip a
+    // spurious boot alarm (matters at low refresh rates where prime times out).
+    if (read_frame_() && frame_primed_) {
       compute_stats_();
       process_roi_temperatures_();
       evaluate_alarm_();
@@ -65,6 +75,9 @@ void M5Thermal2Component::loop() {
       refresh_status_led_();
     }
   } else {
+    // Re-assert buzzer-off every idle cycle (set_buzzer_ is cached, so this is a
+    // no-op unless a prior clear write NACKed — self-heals a stuck buzzer).
+    set_buzzer_(0);
     refresh_status_led_();
   }
 }
@@ -75,7 +88,8 @@ void M5Thermal2Component::trigger_sound_test() {
   ESP_LOGD(TAG, "Sound test: one alarm cycle");
   sound_test_active_ = true;
   sound_test_start_ = millis();
-  set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
+  if (status_led_enabled_)
+    set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
   set_buzzer_(alarm_buzzer_frequency_);  // sounds regardless of the mute switch
 }
 
@@ -205,6 +219,9 @@ void M5Thermal2Component::store_subpage_(const uint16_t *raw, bool subpage) {
     int x = ((idx & 15) << 1) + (((y & 1) != (int) subpage) ? 1 : 0);      // 0..31
     pixels_[y * THERMAL_COLS + x] = ((float) raw[idx]) / 128.0f - 64.0f;
   }
+  subpages_seen_ |= subpage ? 0x02 : 0x01;
+  if (subpages_seen_ == 0x03)
+    frame_primed_ = true;  // both halves captured at least once
 }
 
 bool M5Thermal2Component::read_frame_() {
@@ -226,15 +243,16 @@ bool M5Thermal2Component::read_frame_() {
 }
 
 void M5Thermal2Component::compute_stats_() {
-  float min_temp = pixels_[0];
-  float max_temp = pixels_[0];
+  // Seed the extremes with sentinels updated only inside the filter, so a single
+  // dead/glitched pixel (e.g. pixel 0 reading 447 °C) can't seed min/max.
+  float min_temp = 1000.0f;
+  float max_temp = -1000.0f;
   float sum_temp = 0;
   int valid_count = 0;
 
-  // Filter out invalid/extreme readings (typical usable range for this sensor).
   for (int i = 0; i < THERMAL_PIXELS; i++) {
     float temp = pixels_[i];
-    if (temp > -40.0 && temp < 300.0) {
+    if (in_temp_range(temp)) {
       valid_pixels_[valid_count++] = temp;
       if (temp < min_temp)
         min_temp = temp;
@@ -252,7 +270,8 @@ void M5Thermal2Component::compute_stats_() {
   min_temp_ = min_temp;
   max_temp_ = max_temp;
   avg_temp_ = sum_temp / valid_count;
-  std::sort(valid_pixels_, valid_pixels_ + valid_count);
+  // Only the middle element is needed — nth_element is O(n) vs sort's O(n log n).
+  std::nth_element(valid_pixels_, valid_pixels_ + valid_count / 2, valid_pixels_ + valid_count);
   median_temp_ = valid_pixels_[valid_count / 2];
 
   if (temp_min_sensor_)
@@ -309,20 +328,30 @@ float M5Thermal2Component::get_alarm_source_temp_() const {
 }
 
 void M5Thermal2Component::evaluate_alarm_() {
+  if (!alarm_enabled_)
+    return;  // armed only when an `alarm:` block is configured
+
   float t = get_alarm_source_temp_();
   if (std::isnan(t))
     return;
 
-  // Hysteresis keeps the alarm from chattering when the value hovers at a bound.
+  // High latch with hysteresis.
   if (!alarm_high_active_ && t >= alarm_high_threshold_)
     alarm_high_active_ = true;
   else if (alarm_high_active_ && t <= alarm_high_threshold_ - alarm_hysteresis_)
     alarm_high_active_ = false;
 
-  if (!alarm_low_active_ && t <= alarm_low_threshold_)
-    alarm_low_active_ = true;
-  else if (alarm_low_active_ && t >= alarm_low_threshold_ + alarm_hysteresis_)
+  // Low latch — only when the thresholds are sanely ordered. Guarding against
+  // low >= high stops an overlapping-band config (e.g. low=40, high=30 via the
+  // runtime controls) from latching both sides so the alarm can never clear.
+  if (alarm_low_threshold_ < alarm_high_threshold_) {
+    if (!alarm_low_active_ && t <= alarm_low_threshold_)
+      alarm_low_active_ = true;
+    else if (alarm_low_active_ && t >= alarm_low_threshold_ + alarm_hysteresis_)
+      alarm_low_active_ = false;
+  } else {
     alarm_low_active_ = false;
+  }
 
   bool active = alarm_high_active_ || alarm_low_active_;
   if (active == alarm_active_)
@@ -336,7 +365,8 @@ void M5Thermal2Component::evaluate_alarm_() {
     // Start a blink cycle immediately.
     blink_on_ = true;
     last_blink_time_ = millis();
-    set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
+    if (status_led_enabled_)  // honor the status_led=false knob for the flash too
+      set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
     set_buzzer_(buzzer_enabled_ ? alarm_buzzer_frequency_ : 0);
   } else {
     // Clear: silence the buzzer and restore the status LED right away.
@@ -349,20 +379,21 @@ void M5Thermal2Component::evaluate_alarm_() {
 }
 
 // Toggles the manual buzzer + red LED at beep_interval while the alarm is
-// active. Muting (buzzer_enabled_ off) drops the tone but keeps the red flash.
+// active. Muting drops the tone but keeps the flash; status_led=false drops the
+// flash but keeps the tone.
 void M5Thermal2Component::drive_alarm_output_() {
   uint32_t now = millis();
   if (now - last_blink_time_ < alarm_beep_interval_)
     return;
   last_blink_time_ = now;
   blink_on_ = !blink_on_;
-  if (blink_on_) {
-    set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
-    set_buzzer_(buzzer_enabled_ ? alarm_buzzer_frequency_ : 0);
-  } else {
-    set_led_(0, 0, 0);
-    set_buzzer_(0);
+  if (status_led_enabled_) {
+    if (blink_on_)
+      set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
+    else
+      set_led_(0, 0, 0);
   }
+  set_buzzer_((blink_on_ && buzzer_enabled_) ? alarm_buzzer_frequency_ : 0);
 }
 
 void M5Thermal2Component::set_led_(uint8_t r, uint8_t g, uint8_t b) {
@@ -415,6 +446,9 @@ void M5Thermal2Component::calculate_roi_bounds_(int center_row, int center_col, 
 // Process ROI temperatures from the main pixels_ array
 void M5Thermal2Component::process_roi_temperatures_() {
   if (!roi_config_.enabled || !initialized_) {
+    // Clear the count so a stale ROI reading can't linger: get_alarm_source_temp_
+    // falls back to whole-frame when roi_pixel_count_ is 0.
+    roi_pixel_count_ = 0;
     return;
   }
 
@@ -434,7 +468,7 @@ void M5Thermal2Component::process_roi_temperatures_() {
       float temp = pixels_[pixel_idx];
 
       // Filter out invalid/extreme readings (same range as main processing)
-      if (temp > -40.0 && temp < 300.0) {
+      if (in_temp_range(temp)) {
         valid_pixels_[roi_pixel_count_++] = temp;  // Reuse the existing valid_pixels_ array
         if (temp < min_temp)
           min_temp = temp;
@@ -450,8 +484,8 @@ void M5Thermal2Component::process_roi_temperatures_() {
     roi_max_temp_ = max_temp;
     roi_avg_temp_ = sum_temp / roi_pixel_count_;
 
-    // Calculate ROI median temperature
-    std::sort(valid_pixels_, valid_pixels_ + roi_pixel_count_);
+    // Calculate ROI median temperature (nth_element: only the middle is needed)
+    std::nth_element(valid_pixels_, valid_pixels_ + roi_pixel_count_ / 2, valid_pixels_ + roi_pixel_count_);
     roi_median_temp_ = valid_pixels_[roi_pixel_count_ / 2];
 
     // Update ROI sensors if configured
@@ -493,7 +527,7 @@ uint8_t M5Thermal2Component::parse_refresh_rate_(const std::string &rate_str) {
   return 5;  // Default to 16Hz
 }
 
-// Thermal interpolation functions for smooth upscaling (copied from grow_env_monitor)
+// Thermal interpolation functions for smooth upscaling (shared with the mlx90640 component)
 float M5Thermal2Component::get_point_(float *p, uint8_t rows, uint8_t cols, int8_t x, int8_t y) {
   if (x < 0)
     x = 0;
@@ -555,7 +589,7 @@ void M5Thermal2Component::interpolate_image_(float *src, uint8_t src_rows, uint8
   }
 }
 
-// Thermal color palettes (moved from grow_env_monitor to save RAM)
+// Thermal color palettes (shared with the mlx90640 component; PROGMEM to save RAM)
 const uint16_t M5Thermal2Component::thermal_palette_rainbow_[256] PROGMEM = {
     0x0009, 0x0009, 0x0009, 0x0009, 0x0009, 0x0009, 0x0009, 0x0009, 0x000A, 0x002A, 0x002B, 0x004B, 0x006B, 0x008C,
     0x00AC, 0x00CC, 0x00ED, 0x010D, 0x010E, 0x012E, 0x014E, 0x014F, 0x0170, 0x0190, 0x0190, 0x0191, 0x01B1, 0x01B1,
@@ -989,6 +1023,18 @@ void M5Thermal2Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, 
   int img_width = std::min(width, 160);  // Max 160x120 to save memory
   int img_height = std::min(height, 120);
   ESP_LOGD(TAG, "Generating %dx%d thermal JPEG (requested %dx%d)", img_width, img_height, width, height);
+
+  // ESP32 builds compile with -fno-exceptions, so a failed allocation aborts
+  // (panic reboot) instead of throwing. /thermal.jpg is auto-polled, so under
+  // heap pressure that would reboot-loop. Bail with a 503 up front if the
+  // largest free block can't hold the image buffer plus the encoder's working
+  // set, degrading gracefully instead.
+  size_t image_bytes = (size_t) img_width * img_height * sizeof(uint16_t);
+  if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < image_bytes + 24576) {
+    ESP_LOGW(TAG, "Insufficient heap for thermal JPEG, returning 503");
+    request->send(503, "text/plain", "Low memory");
+    return;
+  }
 
   // Interpolate the latest frame (24x32 -> 48x64) on demand here, rather than
   // every poll cycle, so the loop only pays for it when an image is requested.
@@ -1495,6 +1541,16 @@ void M5Thermal2Component::sync_roi_state_from_controls() {
   if (alarm_low_threshold_control_ != nullptr && !std::isnan(alarm_low_threshold_control_->state)) {
     alarm_low_threshold_ = alarm_low_threshold_control_->state;
     ESP_LOGD(TAG, "Synced alarm low threshold: %.1f°C", alarm_low_threshold_);
+  }
+
+  // Same for the update-interval control, else a restored value shows in the UI
+  // but loop() keeps running at the compile-time default.
+  if (update_interval_control_ != nullptr && !std::isnan(update_interval_control_->state)) {
+    uint32_t v = static_cast<uint32_t>(update_interval_control_->state);
+    if (v > 0) {
+      update_interval_ = v;
+      ESP_LOGD(TAG, "Synced update interval: %ums", update_interval_);
+    }
   }
 
   ESP_LOGD(TAG, "ROI state sync complete - enabled=%s, center=(%d,%d), size=%d", roi_config_.enabled ? "true" : "false",
