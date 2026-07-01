@@ -1,5 +1,5 @@
 import esphome.codegen as cg
-from esphome.components import binary_sensor, i2c, number, select, sensor, switch
+from esphome.components import binary_sensor, button, i2c, number, select, sensor, switch
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
@@ -13,7 +13,7 @@ except ImportError:
 
 CODEOWNERS = ["@dephekt"]
 DEPENDENCIES = ["esp32", "i2c"]
-AUTO_LOAD = ["sensor", "binary_sensor", "number", "select", "switch"]
+AUTO_LOAD = ["sensor", "binary_sensor", "button", "number", "select", "switch"]
 
 # M5Stack Unit Thermal2 namespace and component classes
 m5stack_thermal2_ns = cg.esphome_ns.namespace("m5stack_thermal2")
@@ -29,6 +29,7 @@ M5Thermal2Select = m5stack_thermal2_ns.class_(
 M5Thermal2Switch = m5stack_thermal2_ns.class_(
     "M5Thermal2Switch", switch.Switch, cg.Component
 )
+M5Thermal2Button = m5stack_thermal2_ns.class_("M5Thermal2Button", button.Button)
 
 # Control type enum
 M5Thermal2ControlType = m5stack_thermal2_ns.enum("M5Thermal2ControlType")
@@ -96,6 +97,7 @@ CONF_ALARM_LED_COLOR = "led_color"
 CONF_TEMPERATURE_SENSORS = "temperature_sensors"
 CONF_ALARM_ACTIVE = "alarm_active"
 CONF_BUTTON = "button"
+CONF_ALARM_TEST_BUTTON = "alarm_test_button"
 
 CONF_WEB_SERVER = "web_server"
 CONF_WEB_ENABLE = "enable"
@@ -204,6 +206,7 @@ CONFIG_SCHEMA = cv.Schema(
             device_class="problem"
         ),
         cv.Optional(CONF_BUTTON): binary_sensor.binary_sensor_schema(),
+        cv.Optional(CONF_ALARM_TEST_BUTTON): button.button_schema(M5Thermal2Button),
         cv.Optional(CONF_WEB_SERVER): cv.All(
             cv.Schema(
                 {
@@ -370,6 +373,10 @@ async def to_code(config):
     if CONF_BUTTON in config:
         bsens = await binary_sensor.new_binary_sensor(config[CONF_BUTTON])
         cg.add(var.set_button_sensor(bsens))
+
+    if CONF_ALARM_TEST_BUTTON in config:
+        btn = await button.new_button(config[CONF_ALARM_TEST_BUTTON])
+        cg.add(btn.set_m5stack_thermal2_parent(var))
 
     # Web server
     if CONF_WEB_SERVER in config:

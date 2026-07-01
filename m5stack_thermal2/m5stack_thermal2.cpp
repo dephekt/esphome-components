@@ -57,9 +57,26 @@ void M5Thermal2Component::loop() {
   // the alarm blinks smoothly and UI-driven ROI-mode changes reflect promptly.
   if (alarm_active_) {
     drive_alarm_output_();
+  } else if (sound_test_active_) {
+    // Hold the one-shot test beep + red flash until one beep interval elapses.
+    if (millis() - sound_test_start_ >= alarm_beep_interval_) {
+      sound_test_active_ = false;
+      set_buzzer_(0);
+      refresh_status_led_();
+    }
   } else {
     refresh_status_led_();
   }
+}
+
+void M5Thermal2Component::trigger_sound_test() {
+  if (alarm_active_)
+    return;  // a real alarm is already sounding
+  ESP_LOGD(TAG, "Sound test: one alarm cycle");
+  sound_test_active_ = true;
+  sound_test_start_ = millis();
+  set_led_(alarm_led_r_, alarm_led_g_, alarm_led_b_);
+  set_buzzer_(alarm_buzzer_frequency_);  // sounds regardless of the mute switch
 }
 
 void M5Thermal2Component::dump_config() {

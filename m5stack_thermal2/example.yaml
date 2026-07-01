@@ -109,6 +109,9 @@ m5stack_thermal2:
     name: "Thermal Alarm"
   button:
     name: "Thermal Button"
+  # Momentary button: sounds one alarm cycle as a one-shot test
+  alarm_test_button:
+    name: "Alarm Sound Test"
 
   # Runtime controls (persist across reboots)
   buzzer_enabled_control:

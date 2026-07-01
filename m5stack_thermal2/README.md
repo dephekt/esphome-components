@@ -103,8 +103,10 @@ endpoint, add a `web_server_base:` with an id and reference it via
 ### Sensors and status
 
 `temperature_sensors:` with `min` / `max` / `avg` / `median` / `roi_min` /
-`roi_max` / `roi_avg`. Optional `alarm_active:` (binary_sensor) and `button:`
-(binary_sensor).
+`roi_max` / `roi_avg`. Optional `alarm_active:` (binary_sensor), `button:`
+(binary_sensor for the unit button), and `alarm_test_button:` (a momentary
+`button` that sounds one alarm cycle — buzzer + red flash — as a one-shot test,
+regardless of the mute switch).
 
 ### Controls (all persist across reboots)
 
