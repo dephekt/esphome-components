@@ -54,10 +54,19 @@ void ThermalCameraBase::loop() {
     on_update_tick_(now);
     // Only publish stats / run the post-frame hook once a full frame is
     // ready, so a half-populated frame can't skew stats or trip a spurious
-    // alarm.
-    if (read_frame_()) {
-      compute_stats_();
-      process_roi_temperatures_();
+    // alarm. The frame read + stats run under frame_mutex_ so the http render
+    // task can't observe a half-written pixels_/stats. on_frame_() runs after
+    // the unlock (it reads stats same-task and may do alarm I2C).
+    bool frame_ready;
+    {
+      LockGuard lock(this->frame_mutex_);
+      frame_ready = read_frame_();
+      if (frame_ready) {
+        compute_stats_();
+        process_roi_temperatures_();
+      }
+    }
+    if (frame_ready) {
       on_frame_();
     }
   }
@@ -716,33 +725,42 @@ void ThermalCameraBase::generate_jpg_jpegenc_(AsyncWebServerRequest *request, in
     return;
   }
 
-  // Interpolate the latest frame (24x32 -> 48x64) on demand here, rather than
-  // every poll cycle, so the loop only pays for it when an image is requested.
-  interpolate_image_(pixels_, 24, 32, interpolated_pixels_, 48, 64);
-
-  // Create image data with reduced memory footprint
+  // Allocated outside the lock (heap alloc is lock-free) and kept alive for the
+  // shared-state-free JPEG encode below, which reads image_data after unlock.
   std::vector<uint16_t> image_data(img_width * img_height);
-  for (int y = 0; y < img_height; y++) {
-    for (int x = 0; x < img_width; x++) {
-      // Map to thermal data
-      int thermal_x = (x * 64) / img_width;
-      int thermal_y = (y * 48) / img_height;
-      int pixel_idx = thermal_y * 64 + thermal_x;
+  {
+    // Hold frame_mutex_ across every read of shared frame state — pixels_ (via
+    // interpolate), min/max_temp_ (colorize), and roi_config_ + ROI stats (the
+    // overlays) — so the loop task can't half-update them mid-render. Released
+    // before the dominant JPEG encode, which touches no shared state.
+    LockGuard lock(this->frame_mutex_);
 
-      uint16_t color = 0x0000;
-      if (pixel_idx >= 0 && pixel_idx < (64 * 48)) {
-        float temperature = interpolated_pixels_[pixel_idx];
-        color = temp_to_color(temperature, min_temp_, max_temp_);
+    // Interpolate the latest frame (24x32 -> 48x64) on demand here, rather than
+    // every poll cycle, so the loop only pays for it when an image is requested.
+    interpolate_image_(pixels_, 24, 32, interpolated_pixels_, 48, 64);
+
+    for (int y = 0; y < img_height; y++) {
+      for (int x = 0; x < img_width; x++) {
+        // Map to thermal data
+        int thermal_x = (x * 64) / img_width;
+        int thermal_y = (y * 48) / img_height;
+        int pixel_idx = thermal_y * 64 + thermal_x;
+
+        uint16_t color = 0x0000;
+        if (pixel_idx >= 0 && pixel_idx < (64 * 48)) {
+          float temperature = interpolated_pixels_[pixel_idx];
+          color = temp_to_color(temperature, min_temp_, max_temp_);
+        }
+
+        image_data[y * img_width + x] = color;
       }
-
-      image_data[y * img_width + x] = color;
     }
-  }
 
-  // Add overlays if enabled
-  if (web_overlay_enabled_) {
-    add_roi_overlay_to_image_(image_data, img_width, img_height);
-    add_temperature_text_to_image_(image_data, img_width, img_height);
+    // Add overlays if enabled
+    if (web_overlay_enabled_) {
+      add_roi_overlay_to_image_(image_data, img_width, img_height);
+      add_temperature_text_to_image_(image_data, img_width, img_height);
+    }
   }
 
   // Create smaller JPEG buffer to save memory
