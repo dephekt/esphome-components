@@ -55,18 +55,22 @@ void ThermalCameraBase::loop() {
     // Only publish stats / run the post-frame hook once a full frame is
     // ready, so a half-populated frame can't skew stats or trip a spurious
     // alarm. The frame read + stats run under frame_mutex_ so the http render
-    // task can't observe a half-written pixels_/stats. on_frame_() runs after
-    // the unlock (it reads stats same-task and may do alarm I2C).
+    // task can't observe a half-written pixels_/stats. Publishing and
+    // on_frame_() run after the unlock (they read stats same-task; publishing
+    // must not hold the lock — see publish_stats_ — and on_frame_ may do alarm
+    // I2C).
     bool frame_ready;
+    bool stats_valid = false;
     {
       LockGuard lock(this->frame_mutex_);
       frame_ready = read_frame_();
       if (frame_ready) {
-        compute_stats_();
+        stats_valid = compute_stats_();
         process_roi_temperatures_();
       }
     }
     if (frame_ready) {
+      publish_stats_(stats_valid);
       on_frame_();
     }
   }
@@ -95,7 +99,7 @@ void ThermalCameraBase::dump_config() {
 #endif
 }
 
-void ThermalCameraBase::compute_stats_() {
+bool ThermalCameraBase::compute_stats_() {
   // Seed the extremes with sentinels updated only inside the filter, so a single
   // dead/glitched pixel (e.g. pixel 0 reading 447 °C) can't seed min/max.
   float min_temp = 1000.0f;
@@ -117,7 +121,7 @@ void ThermalCameraBase::compute_stats_() {
 
   if (valid_count == 0) {
     ESP_LOGW(TAG, "No valid thermal readings - all pixels out of range");
-    return;
+    return false;
   }
 
   min_temp_ = min_temp;
@@ -127,17 +131,38 @@ void ThermalCameraBase::compute_stats_() {
   std::nth_element(valid_pixels_, valid_pixels_ + valid_count / 2, valid_pixels_ + valid_count);
   median_temp_ = valid_pixels_[valid_count / 2];
 
-  if (temp_min_sensor_)
-    temp_min_sensor_->publish_state(min_temp_);
-  if (temp_max_sensor_)
-    temp_max_sensor_->publish_state(max_temp_);
-  if (temp_avg_sensor_)
-    temp_avg_sensor_->publish_state(avg_temp_);
-  if (median_sensor_)
-    median_sensor_->publish_state(median_temp_);
-
   ESP_LOGD(TAG, "Thermal (%d px) - Min: %.1f°C, Max: %.1f°C, Avg: %.1f°C, Median: %.1f°C", valid_count, min_temp_,
            max_temp_, avg_temp_, median_temp_);
+  return true;
+}
+
+// Publishes the frame + ROI sensor states. Called from loop() AFTER frame_mutex_
+// is released, because publish_state() synchronously fires user on_value
+// automations that may write back a control and re-enter the (non-recursive)
+// frame_mutex_ on this task. Runs on the loop task, so the members it reads are
+// stable until the next tick.
+void ThermalCameraBase::publish_stats_(bool stats_valid) {
+  if (stats_valid) {
+    if (temp_min_sensor_)
+      temp_min_sensor_->publish_state(min_temp_);
+    if (temp_max_sensor_)
+      temp_max_sensor_->publish_state(max_temp_);
+    if (temp_avg_sensor_)
+      temp_avg_sensor_->publish_state(avg_temp_);
+    if (median_sensor_)
+      median_sensor_->publish_state(median_temp_);
+  }
+
+  // ROI sensors publish only when ROI is on and had valid pixels this frame
+  // (mirrors the old in-compute_roi guard).
+  if (roi_config_.enabled && roi_pixel_count_ > 0) {
+    if (roi_min_sensor_)
+      roi_min_sensor_->publish_state(roi_min_temp_);
+    if (roi_max_sensor_)
+      roi_max_sensor_->publish_state(roi_max_temp_);
+    if (roi_avg_sensor_)
+      roi_avg_sensor_->publish_state(roi_avg_temp_);
+  }
 }
 
 // ROI calculation helper - converts 1-based user coordinates to 0-based array bounds
@@ -199,13 +224,7 @@ void ThermalCameraBase::process_roi_temperatures_() {
     std::nth_element(valid_pixels_, valid_pixels_ + roi_pixel_count_ / 2, valid_pixels_ + roi_pixel_count_);
     roi_median_temp_ = valid_pixels_[roi_pixel_count_ / 2];
 
-    // Update ROI sensors if configured
-    if (roi_min_sensor_)
-      roi_min_sensor_->publish_state(roi_min_temp_);
-    if (roi_max_sensor_)
-      roi_max_sensor_->publish_state(roi_max_temp_);
-    if (roi_avg_sensor_)
-      roi_avg_sensor_->publish_state(roi_avg_temp_);
+    // ROI sensors are published in publish_stats_(), outside frame_mutex_.
 
     ESP_LOGD(TAG, "ROI (%d,%d) size=%d (%d pixels) - Min: %.1f°C, Max: %.1f°C, Avg: %.1f°C, Median: %.1f°C",
              roi_config_.center_row, roi_config_.center_col, roi_config_.size, roi_pixel_count_, roi_min_temp_,

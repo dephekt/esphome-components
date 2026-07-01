@@ -185,8 +185,17 @@ class ThermalCameraBase : public Component, public i2c::I2CDevice {
   // alarm/LED/buzzer output driving that must stay smooth between frames).
   virtual void on_loop_(uint32_t now) {}
 
-  void compute_stats_();
+  // Computes whole-frame stats into the members under frame_mutex_; returns
+  // false (without touching them) when no pixel is in-range. Does NOT publish —
+  // see publish_stats_.
+  bool compute_stats_();
   void process_roi_temperatures_();
+  // Publishes the frame/ROI sensor states. Kept separate from the compute step
+  // so loop() can call it AFTER releasing frame_mutex_: publish_state() runs any
+  // user on_value automation synchronously, and one that writes back a control
+  // (e.g. ROI size) re-enters frame_mutex_ on this same task — a non-recursive
+  // mutex, so that would self-deadlock.
+  void publish_stats_(bool stats_valid);
   void calculate_roi_bounds_(int center_row, int center_col, int size, int &min_row, int &max_row, int &min_col,
                              int &max_col) const;
 
