@@ -131,7 +131,32 @@ bool M5Thermal2Component::init_device_() {
 
   set_buzzer_(0);  // silent until an alarm fires
   initialized_ = true;
+
+  // Prime a full (both-subpage) frame here in setup() where blocking is free, so
+  // the very first published stats/alarm start from real data instead of a
+  // half-empty frame. Afterwards loop() reads one subpage per cycle (rolling).
+  prime_frame_();
   return true;
+}
+
+// Blocking read of both subpages into a coherent frame. Only called from setup().
+void M5Thermal2Component::prime_frame_() {
+  uint32_t start = millis();
+  bool got_sub0 = false, got_sub1 = false;
+  while ((!got_sub0 || !got_sub1) && (millis() - start < 500)) {
+    uint8_t ctrl[2];
+    if (this->read_register(REG_REFRESH_CTRL, ctrl, 2) == i2c::ERROR_OK && (ctrl[0] & 0x01)) {
+      bool subpage = ctrl[1] & 0x01;
+      if (((subpage && !got_sub1) || (!subpage && !got_sub0)) && read_subpage_pixels_()) {
+        store_subpage_(pixel_raw_, subpage);
+        if (subpage)
+          got_sub1 = true;
+        else
+          got_sub0 = true;
+      }
+    }
+    delay(4);
+  }
 }
 
 // Reads REG_PIXEL_DATA (0x80) — 768 bytes = 384 little-endian uint16 for the
@@ -166,38 +191,20 @@ void M5Thermal2Component::store_subpage_(const uint16_t *raw, bool subpage) {
 }
 
 bool M5Thermal2Component::read_frame_() {
+  // One subpage per cycle into the persistent 32x24 buffer: the opposite half
+  // carries over from the previous cycle (rolling frame). This keeps loop()
+  // blocking to a single ~20ms pixel read instead of waiting out a subpage flip.
+  // The unit alternates subpages, so both halves refresh within two cycles.
   uint8_t ctrl[2];
   if (this->read_register(REG_REFRESH_CTRL, ctrl, 2) != i2c::ERROR_OK)
     return false;
   if ((ctrl[0] & 0x01) == 0)
     return false;  // no fresh frame yet
-  bool first_subpage = ctrl[1] & 0x01;
+  bool subpage = ctrl[1] & 0x01;
 
   if (!read_subpage_pixels_())
     return false;
-  store_subpage_(pixel_raw_, first_subpage);
-
-  // Bounded wait for the opposite subpage so the assembled frame is coherent
-  // rather than a half-stale checkerboard. Times out gracefully.
-  uint32_t start = millis();
-  bool got_second = false;
-  while (millis() - start < 120) {
-    if (this->read_register(REG_REFRESH_CTRL, ctrl, 2) != i2c::ERROR_OK)
-      break;
-    if ((ctrl[0] & 0x01) && ((bool) (ctrl[1] & 0x01) != first_subpage)) {
-      if (read_subpage_pixels_()) {
-        store_subpage_(pixel_raw_, ctrl[1] & 0x01);
-        got_second = true;
-      }
-      break;
-    }
-    delay(2);
-  }
-  if (!got_second)
-    ESP_LOGV(TAG, "Only one subpage captured this cycle (frame half-fresh)");
-
-  // Interpolate for the display/JPEG path (24x32 -> 48x64).
-  interpolate_image_(pixels_, 24, 32, interpolated_pixels_, 48, 64);
+  store_subpage_(pixel_raw_, subpage);
   return true;
 }
 
@@ -965,6 +972,10 @@ void M5Thermal2Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, 
   int img_width = std::min(width, 160);  // Max 160x120 to save memory
   int img_height = std::min(height, 120);
   ESP_LOGD(TAG, "Generating %dx%d thermal JPEG (requested %dx%d)", img_width, img_height, width, height);
+
+  // Interpolate the latest frame (24x32 -> 48x64) on demand here, rather than
+  // every poll cycle, so the loop only pays for it when an image is requested.
+  interpolate_image_(pixels_, 24, 32, interpolated_pixels_, 48, 64);
 
   // Create image data with reduced memory footprint
   std::vector<uint16_t> image_data(img_width * img_height);
