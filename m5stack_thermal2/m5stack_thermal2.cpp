@@ -362,6 +362,10 @@ void M5Thermal2Component::evaluate_alarm_() {
     alarm_active_sensor_->publish_state(alarm_active_);
 
   if (alarm_active_) {
+    // A real alarm takes over the buzzer/LED, so cleanly preempt any in-progress
+    // sound test — otherwise its leftover sound_test_active_ would make the loop
+    // idle branch and the alarm-clear path fight over the outputs mid-test.
+    sound_test_active_ = false;
     // Start a blink cycle immediately.
     blink_on_ = true;
     last_blink_time_ = millis();
@@ -1107,10 +1111,13 @@ void M5Thermal2Component::generate_jpg_jpegenc_(AsyncWebServerRequest *request, 
   ESP_LOGD(TAG, "JPEG created in memory: %d bytes", jpeg_size);
 
   if (jpeg_size > 0) {
-    // Serve JPEG from memory. Copy into a std::string response (web_server_idf
-    // dropped beginResponse_P); the copy lets us free jpg_buffer below safely.
-    std::string jpg_content(reinterpret_cast<const char *>(jpg_buffer), jpeg_size);
-    AsyncWebServerResponse *response = request->beginResponse(200, "image/jpeg", jpg_content);
+    // Serve straight from jpg_buffer via the pointer overload — no std::string
+    // copy (and no response-internal copy), so the encoded JPEG isn't briefly
+    // held two or three times while image_data is still alive. send() maps to a
+    // synchronous httpd_resp_send, so jpg_buffer stays valid through the transmit
+    // and is freed right after.
+    AsyncWebServerResponse *response =
+        request->beginResponse(200, "image/jpeg", jpg_buffer, static_cast<size_t>(jpeg_size));
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
