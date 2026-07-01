@@ -211,6 +211,7 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   bool write_reg16_(uint8_t reg, uint16_t value);
 
   bool init_device_();
+  void prime_frame_();
   bool read_frame_();
   bool read_subpage_pixels_();
   void store_subpage_(const uint16_t *raw, bool subpage);
