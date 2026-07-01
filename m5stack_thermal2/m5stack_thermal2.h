@@ -4,6 +4,7 @@
 #include "esphome/core/preferences.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/button/button.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/switch/switch.h"
@@ -126,6 +127,10 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   bool is_buzzer_enabled() const { return buzzer_enabled_; }
   void update_alarm_high_threshold(float t) { alarm_high_threshold_ = t; }
   void update_alarm_low_threshold(float t) { alarm_low_threshold_ = t; }
+
+  // Sound one alarm cycle as a one-shot test (buzzer + red flash for one beep),
+  // regardless of the mute switch. No-op while a real alarm is already active.
+  void trigger_sound_test();
 
 #ifdef USE_NETWORK
   // Web server configuration
@@ -277,6 +282,10 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   bool alarm_low_active_{false};
   bool blink_on_{false};
   uint32_t last_blink_time_{0};
+
+  // One-shot sound-test state
+  bool sound_test_active_{false};
+  uint32_t sound_test_start_{0};
 
   // Cached hardware output state (avoid redundant I2C writes)
   uint8_t function_ctrl_{0};
@@ -438,6 +447,21 @@ class M5Thermal2Switch : public switch_::Switch, public Component {
  private:
   M5Thermal2Component *parent_{nullptr};
   M5Thermal2ControlType control_type_{ROI_ENABLED};
+};
+
+// M5Thermal2Button - momentary button that sounds one alarm cycle as a test
+class M5Thermal2Button : public button::Button {
+ public:
+  void set_m5stack_thermal2_parent(M5Thermal2Component *parent) { parent_ = parent; }
+
+ protected:
+  void press_action() override {
+    if (parent_ != nullptr)
+      parent_->trigger_sound_test();
+  }
+
+ private:
+  M5Thermal2Component *parent_{nullptr};
 };
 
 }  // namespace m5stack_thermal2
