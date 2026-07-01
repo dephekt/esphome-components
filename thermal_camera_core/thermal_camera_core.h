@@ -53,18 +53,27 @@ class ThermalCameraBase : public Component, public i2c::I2CDevice {
 
   // ROI configuration
   void set_roi_config(const ROIConfig &config) { roi_config_ = config; }
-  virtual void update_roi_enabled(bool enabled) { roi_config_.enabled = enabled; }
+  virtual void update_roi_enabled(bool enabled) {
+    LockGuard lock(this->frame_mutex_);
+    roi_config_.enabled = enabled;
+  }
   virtual void update_roi_center_row(int row) {
-    if (row >= 1 && row <= 24)
+    if (row >= 1 && row <= 24) {
+      LockGuard lock(this->frame_mutex_);
       roi_config_.center_row = row;
+    }
   }
   virtual void update_roi_center_col(int col) {
-    if (col >= 1 && col <= 32)
+    if (col >= 1 && col <= 32) {
+      LockGuard lock(this->frame_mutex_);
       roi_config_.center_col = col;
+    }
   }
   virtual void update_roi_size(int size) {
-    if (size >= 1 && size <= 10)
+    if (size >= 1 && size <= 10) {
+      LockGuard lock(this->frame_mutex_);
       roi_config_.size = size;
+    }
   }
 
   // Web-overlay toggle. Always available: the value is only consumed by the
@@ -230,6 +239,12 @@ class ThermalCameraBase : public Component, public i2c::I2CDevice {
 
   // Hardware state
   bool initialized_{false};
+
+  // Serializes the loop-task frame update (read_frame_ + compute_stats_ +
+  // process_roi_temperatures_ + roi_config_ writes) against the esp_http_server
+  // render read (interpolate + colorize + overlay). Non-recursive: never
+  // re-acquire while held, and keep the getters/render helpers lock-free.
+  Mutex frame_mutex_;
 
   // Data buffers (class members to prevent stack overflow; zero-init so a
   // pre-prime read never exposes indeterminate RAM to stats/alarm/JPEG).

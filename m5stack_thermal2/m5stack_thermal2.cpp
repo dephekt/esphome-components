@@ -200,8 +200,8 @@ void M5Thermal2Component::handle_button_() {
   if (btn & BUTTON_WAS_CLICKED) {
     // Toggle ROI mode. Keep the switch entity in sync so the change reflects in
     // the UI too (publish_state, not a command, so no recursion into the unit).
-    bool new_state = !roi_config_.enabled;
-    roi_config_.enabled = new_state;
+    bool new_state = !roi_config_.enabled;  // benign same-task read
+    update_roi_enabled(new_state);           // guarded write (frame_mutex_)
     if (roi_enabled_control_ != nullptr)
       roi_enabled_control_->publish_state(new_state);
     ESP_LOGD(TAG, "Button click: ROI mode %s", new_state ? "ON" : "OFF");
