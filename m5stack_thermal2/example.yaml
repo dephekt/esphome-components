@@ -1,0 +1,133 @@
+# Example usage of the M5Stack Unit Thermal2 (MLX90640 behind a PICO-D4) driver.
+#
+# The Thermal2 answers at I2C 0x32 and does all thermal computation onboard, so
+# no emissivity/calibration config is needed. This component adds a software
+# temperature alarm that beeps the unit's buzzer and flashes its RGB, an
+# off-center software ROI, a button-driven ROI toggle, and a /thermal.jpg image.
+#
+# Compile-check locally from the repo root:
+#   ./docker/esphome config  m5stack_thermal2/example.yaml
+#   ./docker/esphome compile m5stack_thermal2/example.yaml
+
+esphome:
+  name: thermal2-monitor
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# WiFi enables USE_NETWORK so the /thermal.jpg endpoint is built.
+wifi:
+  ssid: "example-ssid"
+  password: "example-password"
+
+logger:
+
+# Pull the component from this repo (local checkout mounted at /config).
+external_components:
+  - source:
+      type: local
+      path: /config
+    components: [m5stack_thermal2]
+
+i2c:
+  sda: 2
+  scl: 1
+  frequency: 400kHz
+  scan: true
+
+web_server_base:
+  id: my_web_server_base
+
+web_server:
+  version: 3
+  port: 80
+
+m5stack_thermal2:
+  id: thermal_camera
+  address: 0x32
+
+  # Hardware settings
+  refresh_rate: "16Hz"        # 0.5Hz to 64Hz
+  noise_filter: 8             # 0 (off) to 15
+  update_interval: 2000       # milliseconds (raw int)
+  thermal_palette: "ironblack"
+
+  # Status LED: green = healthy, blue = ROI mode, flashing red = alarm.
+  # Set false to keep the LED dark in normal/ROI states (alarm red still flashes).
+  status_led: true
+
+  # Software temperature alarm: beeps the buzzer + flashes the RGB red when the
+  # monitored region's average crosses a threshold. Evaluated on the same region
+  # the roi_* sensors report (whole-frame, or the ROI when ROI mode is on).
+  alarm:
+    source: average           # average | median | min | max
+    region: active            # active (follow ROI mode) | frame | roi
+    high_threshold: 35.0       # °C
+    low_threshold: 5.0         # °C
+    hysteresis: 0.5            # °C, prevents chatter at the bound
+    buzzer_frequency: 4000     # Hz (0 = silent)
+    buzzer_volume: 96          # 0-255
+    beep_interval: 250         # ms on/off cycle for the beep + flash
+    led_color: [16, 0, 0]      # RGB of the alarm flash (default red)
+
+  # Off-center software ROI (unlike the unit's centered hardware ROI).
+  roi:
+    enabled: false
+    center_row: 12
+    center_col: 16
+    size: 3                    # (2*size+1) square
+
+  # /thermal.jpg endpoint
+  web_server:
+    enable: true
+    path: "/thermal.jpg"
+    quality: 90
+    overlay_enabled: true
+    web_server_base_id: my_web_server_base
+
+  # Temperature sensors
+  temperature_sensors:
+    min:
+      name: "Thermal Min temp"
+    max:
+      name: "Thermal Max temp"
+    avg:
+      name: "Thermal Mean temp"
+    median:
+      name: "Thermal Median temp"
+    roi_min:
+      name: "Thermal ROI Min temp"
+    roi_max:
+      name: "Thermal ROI Max temp"
+    roi_avg:
+      name: "Thermal ROI Mean temp"
+
+  # Status entities
+  alarm_active:
+    name: "Thermal Alarm"
+  button:
+    name: "Thermal Button"
+
+  # Runtime controls (persist across reboots)
+  buzzer_enabled_control:
+    name: "Buzzer Enabled"
+  alarm_high_threshold_control:
+    name: "Alarm High Threshold"
+  alarm_low_threshold_control:
+    name: "Alarm Low Threshold"
+  thermal_palette_control:
+    name: "Thermal Color Palette"
+  roi_enabled_control:
+    name: "ROI Enabled"
+  roi_center_row_control:
+    name: "ROI Center Row"
+  roi_center_col_control:
+    name: "ROI Center Column"
+  roi_size_control:
+    name: "ROI Size"
+  update_interval_control:
+    name: "Thermal Update Interval"
+  web_overlay_enabled_control:
+    name: "Thermal Overlay Enable"
