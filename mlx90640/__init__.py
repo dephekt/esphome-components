@@ -103,7 +103,7 @@ CONFIG_SCHEMA = (
                 }
             ),
             cv.Optional(CONF_REFLECTED_TEMPERATURE_AUTO_CONTROL): switch.switch_schema(
-                ThermalSwitch
+                ThermalSwitch, default_restore_mode="RESTORE_DEFAULT_ON"
             ),
         }
     )
@@ -186,9 +186,6 @@ async def to_code(config):
         await switch.register_switch(switch_var, switch_config)
         cg.add(switch_var.set_thermal_parent(var))
         cg.add(switch_var.set_control_type(REFLECTED_TEMPERATURE_AUTO))
-        cg.add(
-            switch_var.set_restore_mode(
-                switch.SwitchRestoreMode.SWITCH_RESTORE_DEFAULT_ON
-            )
-        )
+        # restore_mode comes from the switch schema (default RESTORE_DEFAULT_ON),
+        # so a user-configured restore_mode: is honored by register_switch above.
         cg.add(var.set_reflected_temperature_auto_control(switch_var))
