@@ -84,6 +84,7 @@ CONF_ROI_CENTER_COL = "center_col"
 CONF_ROI_SIZE = "size"
 
 CONF_ALARM = "alarm"
+CONF_ALARM_ENABLED = "enabled"
 CONF_ALARM_SOURCE = "source"
 CONF_ALARM_REGION = "region"
 CONF_ALARM_HIGH_THRESHOLD = "high_threshold"
@@ -129,6 +130,15 @@ def validate_rgb(value):
     return value
 
 
+def validate_alarm(config):
+    if config[CONF_ALARM_LOW_THRESHOLD] >= config[CONF_ALARM_HIGH_THRESHOLD]:
+        raise cv.Invalid(
+            f"'{CONF_ALARM_LOW_THRESHOLD}' ({config[CONF_ALARM_LOW_THRESHOLD]}) must be "
+            f"below '{CONF_ALARM_HIGH_THRESHOLD}' ({config[CONF_ALARM_HIGH_THRESHOLD]})"
+        )
+    return config
+
+
 def validate_web_server_config(config):
     if config.get(CONF_WEB_ENABLE, False) and CONF_WEB_SERVER_BASE_ID not in config:
         raise cv.Invalid(
@@ -168,28 +178,32 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_ROI_SIZE, default=2): cv.int_range(min=1, max=10),
             }
         ),
-        cv.Optional(CONF_ALARM): cv.Schema(
-            {
-                cv.Optional(CONF_ALARM_SOURCE, default="average"): cv.enum(
-                    ALARM_SOURCES, lower=True
-                ),
-                cv.Optional(CONF_ALARM_REGION, default="active"): cv.enum(
-                    ALARM_REGIONS, lower=True
-                ),
-                cv.Optional(CONF_ALARM_HIGH_THRESHOLD, default=35.0): cv.float_,
-                cv.Optional(CONF_ALARM_LOW_THRESHOLD, default=5.0): cv.float_,
-                cv.Optional(CONF_ALARM_HYSTERESIS, default=0.5): cv.positive_float,
-                cv.Optional(CONF_ALARM_BUZZER_FREQUENCY, default=4000): cv.int_range(
-                    min=0, max=20000
-                ),
-                cv.Optional(CONF_ALARM_BUZZER_VOLUME, default=96): cv.int_range(
-                    min=0, max=255
-                ),
-                cv.Optional(CONF_ALARM_BEEP_INTERVAL, default=250): cv.int_range(
-                    min=50, max=2550
-                ),
-                cv.Optional(CONF_ALARM_LED_COLOR, default=[16, 0, 0]): validate_rgb,
-            }
+        cv.Optional(CONF_ALARM): cv.All(
+            cv.Schema(
+                {
+                    cv.Optional(CONF_ALARM_ENABLED, default=True): cv.boolean,
+                    cv.Optional(CONF_ALARM_SOURCE, default="average"): cv.enum(
+                        ALARM_SOURCES, lower=True
+                    ),
+                    cv.Optional(CONF_ALARM_REGION, default="active"): cv.enum(
+                        ALARM_REGIONS, lower=True
+                    ),
+                    cv.Optional(CONF_ALARM_HIGH_THRESHOLD, default=35.0): cv.float_,
+                    cv.Optional(CONF_ALARM_LOW_THRESHOLD, default=5.0): cv.float_,
+                    cv.Optional(CONF_ALARM_HYSTERESIS, default=0.5): cv.positive_float,
+                    cv.Optional(
+                        CONF_ALARM_BUZZER_FREQUENCY, default=4000
+                    ): cv.int_range(min=0, max=20000),
+                    cv.Optional(CONF_ALARM_BUZZER_VOLUME, default=96): cv.int_range(
+                        min=0, max=255
+                    ),
+                    cv.Optional(CONF_ALARM_BEEP_INTERVAL, default=250): cv.int_range(
+                        min=50, max=2550
+                    ),
+                    cv.Optional(CONF_ALARM_LED_COLOR, default=[16, 0, 0]): validate_rgb,
+                }
+            ),
+            validate_alarm,
         ),
         cv.Optional(CONF_TEMPERATURE_SENSORS): cv.Schema(
             {
@@ -330,6 +344,9 @@ async def to_code(config):
     alarm_high = alarm.get(CONF_ALARM_HIGH_THRESHOLD, 35.0)
     alarm_low = alarm.get(CONF_ALARM_LOW_THRESHOLD, 5.0)
     if CONF_ALARM in config:
+        # Arm the alarm only when an `alarm:` block is present (and enabled), so a
+        # camera-only config never beeps/flashes on its own.
+        cg.add(var.set_alarm_enabled(alarm[CONF_ALARM_ENABLED]))
         cg.add(var.set_alarm_source(alarm[CONF_ALARM_SOURCE]))
         cg.add(var.set_alarm_region(alarm[CONF_ALARM_REGION]))
         cg.add(var.set_alarm_high_threshold(alarm_high))

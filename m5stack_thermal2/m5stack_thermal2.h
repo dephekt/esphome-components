@@ -108,6 +108,7 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
 
   // Alarm configuration (static, from YAML)
   void set_status_led_enabled(bool enabled) { status_led_enabled_ = enabled; }
+  void set_alarm_enabled(bool enabled) { alarm_enabled_ = enabled; }
   void set_alarm_source(AlarmSource source) { alarm_source_ = source; }
   void set_alarm_region(AlarmRegion region) { alarm_region_ = region; }
   void set_alarm_high_threshold(float t) { alarm_high_threshold_ = t; }
@@ -123,7 +124,13 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   }
 
   // Alarm runtime updates (from controls)
-  void update_buzzer_enabled(bool enabled) { buzzer_enabled_ = enabled; }
+  void update_buzzer_enabled(bool enabled) {
+    buzzer_enabled_ = enabled;
+    // Apply immediately during an audible beep so mute/unmute isn't delayed up
+    // to a full beep interval.
+    if (alarm_active_ && blink_on_)
+      set_buzzer_(enabled ? alarm_buzzer_frequency_ : 0);
+  }
   bool is_buzzer_enabled() const { return buzzer_enabled_; }
   void update_alarm_high_threshold(float t) { alarm_high_threshold_ = t; }
   void update_alarm_low_threshold(float t) { alarm_low_threshold_ = t; }
@@ -132,14 +139,18 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   // regardless of the mute switch. No-op while a real alarm is already active.
   void trigger_sound_test();
 
+  // Web-overlay toggle. Always available: the value is only consumed by the
+  // network-gated JPEG code, but the switch/control that drives it is compiled
+  // regardless of USE_NETWORK, so these callers must resolve without it.
+  void set_web_overlay_enabled(bool enabled) { web_overlay_enabled_ = enabled; }
+  void update_web_overlay_enabled(bool enabled) { web_overlay_enabled_ = enabled; }
+  bool is_web_overlay_enabled() const { return web_overlay_enabled_; }
+
 #ifdef USE_NETWORK
   // Web server configuration
   void set_web_server_enabled(bool enabled) { web_server_enabled_ = enabled; }
   void set_web_server_path(const std::string &path) { web_server_path_ = path; }
   void set_web_server_quality(int quality) { web_server_quality_ = quality; }
-  void set_web_overlay_enabled(bool enabled) { web_overlay_enabled_ = enabled; }
-  void update_web_overlay_enabled(bool enabled) { web_overlay_enabled_ = enabled; }
-  bool is_web_overlay_enabled() const { return web_overlay_enabled_; }
   void set_web_server_base(web_server_base::WebServerBase *base) { base_ = base; }
   void set_web_html_page_enabled(bool enabled) { web_html_page_enabled_ = enabled; }
 #endif
@@ -262,6 +273,7 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   ROIConfig roi_config_;
 
   // Alarm configuration
+  bool alarm_enabled_{false};  // armed only when an `alarm:` block is configured
   bool status_led_enabled_{true};
   AlarmSource alarm_source_{ALARM_SOURCE_AVERAGE};
   AlarmRegion alarm_region_{ALARM_REGION_ACTIVE};
@@ -298,12 +310,14 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
   std::string thermal_palette_{"rainbow"};
   const uint16_t *current_palette_{nullptr};
 
+  // Web-overlay flag (always compiled — see the toggle methods above).
+  bool web_overlay_enabled_{true};
+
 #ifdef USE_NETWORK
   // Web server configuration
   bool web_server_enabled_{false};
   std::string web_server_path_{"/thermal.jpg"};
   int web_server_quality_{85};
-  bool web_overlay_enabled_{true};
   bool web_html_page_enabled_{true};
   std::string web_html_path_;  // viewer page path, derived from web_server_path_ at setup
   web_server_base::WebServerBase *base_;
@@ -311,13 +325,16 @@ class M5Thermal2Component : public Component, public i2c::I2CDevice {
 
   // Hardware state
   bool initialized_{false};
+  bool frame_primed_{false};    // both subpages captured at least once
+  uint8_t subpages_seen_{0};    // bit0 = subpage 0, bit1 = subpage 1
 
-  // Data buffers (class members to prevent stack overflow)
-  float pixels_[THERMAL_PIXELS];        // Assembled thermal frame (32x24), °C
-  float interpolated_pixels_[64 * 48];  // Upscaled thermal data for display
-  float valid_pixels_[THERMAL_PIXELS];  // Valid pixel buffer for sorting
-  uint16_t pixel_raw_[SUBPAGE_PIXELS];  // Raw subpage read buffer
-  float adj_2d_[16];                    // Adjacent matrix for interpolation
+  // Data buffers (class members to prevent stack overflow; zero-init so a
+  // pre-prime read never exposes indeterminate RAM to stats/alarm/JPEG).
+  float pixels_[THERMAL_PIXELS]{};        // Assembled thermal frame (32x24), °C
+  float interpolated_pixels_[64 * 48]{};  // Upscaled thermal data for display
+  float valid_pixels_[THERMAL_PIXELS]{};  // Valid pixel buffer for sorting
+  uint16_t pixel_raw_[SUBPAGE_PIXELS]{};  // Raw subpage read buffer
+  float adj_2d_[16]{};                    // Adjacent matrix for interpolation
 
   // Temperature statistics
   float min_temp_{20.0};
@@ -403,7 +420,7 @@ class M5Thermal2Number : public number::Number, public Component {
 
  private:
   M5Thermal2Component *parent_{nullptr};
-  M5Thermal2ControlType control_type_;
+  M5Thermal2ControlType control_type_{UPDATE_INTERVAL};
   bool restore_value_{false};
   float initial_value_{NAN};
   ESPPreferenceObject pref_;
