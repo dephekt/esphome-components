@@ -15,6 +15,7 @@ adopted à la carte.
 | Component | What it does | Docs |
 |---|---|---|
 | **`mlx90640`** | Melexis MLX90640 32×24 thermal camera: per-pixel temperatures, min/max/avg and region-of-interest (ROI) stats, configurable emissivity/refresh/resolution, color palettes, and a self-contained thermal-viewer web page (plus on-demand JPEG renders) served over HTTP. | [README](mlx90640/README.md) · [example](mlx90640/example.yaml) |
+| **`m5stack_thermal2`** | M5Stack Unit Thermal2 (MLX90640 behind a PICO-D4 at `0x32`): whole-frame + off-center ROI temperature stats, a `/thermal.jpg` image, plus a software temperature alarm that beeps the unit's buzzer and flashes its RGB red (with a mute switch and button-driven ROI toggle). Sibling to `mlx90640`, for the newer smart unit. | [README](m5stack_thermal2/README.md) · [example](m5stack_thermal2/example.yaml) |
 | **`scd4x_stats`** | Derived sensors for an SCD4x CO₂ sensor: VPD (vapor-pressure deficit), daily min/max, and moving averages, with a midnight reset. | [README](scd4x_stats/README.md) |
 | **`scd4x_alerts`** | Debounced threshold alerting over CO₂, temperature, humidity, and VPD. Emits `binary_sensor` alert outputs with user-adjustable `number` thresholds and configurable on/off delays. | [README](scd4x_alerts/README.md) |
 | **`ezo_types`** | Typed support for Atlas Scientific **EZO** circuits (pH, EC, RTD, ORP). A multi-platform component (`sensor`/`select`/`number`/`switch`) with diagnostic sensors, calibration controls, and temperature-compensated reads. | [README](ezo_types/README.md) |
