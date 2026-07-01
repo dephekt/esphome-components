@@ -145,7 +145,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_WEB_SERVER): web_server_schema(),
             # Device-specific auto-generated control entities
             cv.Optional(CONF_BUZZER_ENABLED_CONTROL): switch.switch_schema(
-                ThermalSwitch
+                ThermalSwitch, default_restore_mode="RESTORE_DEFAULT_ON"
             ),
             cv.Optional(CONF_ALARM_HIGH_THRESHOLD_CONTROL): number.number_schema(
                 ThermalNumber, unit_of_measurement="°C"
@@ -234,11 +234,8 @@ async def to_code(config):
         await switch.register_switch(switch_var, switch_config)
         cg.add(switch_var.set_thermal_parent(var))
         cg.add(switch_var.set_control_type(BUZZER_ENABLED))
-        cg.add(
-            switch_var.set_restore_mode(
-                switch.SwitchRestoreMode.SWITCH_RESTORE_DEFAULT_ON
-            )
-        )
+        # restore_mode comes from the switch schema (default RESTORE_DEFAULT_ON),
+        # so a user-configured restore_mode: is honored by register_switch above.
         cg.add(var.set_buzzer_enabled_control(switch_var))
 
     if CONF_ALARM_HIGH_THRESHOLD_CONTROL in config:
