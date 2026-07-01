@@ -41,7 +41,9 @@ external_components:
       type: git
       url: https://github.com/dephekt/esphome-components
       path: .
-    components: [m5stack_thermal2]
+    # thermal_camera_core is the shared base this driver AUTO_LOADs; a git
+    # source must list it explicitly (a local source picks it up automatically).
+    components: [m5stack_thermal2, thermal_camera_core]
 
 i2c:
   sda: 2

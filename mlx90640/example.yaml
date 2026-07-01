@@ -16,14 +16,23 @@ i2c:
   scl: 22
   scan: true
 
+# WiFi enables USE_NETWORK so the /thermal.jpg endpoint is built.
+wifi:
+  ssid: "example-ssid"
+  password: "example-password"
+
 # External components - users can reference this component.
-# Components live at the repository root, so path must point there (path: .).
+# Compile-check locally from the repo root against the local checkout (not a
+# published tag) so this example always exercises the current source tree:
+#   ./docker/esphome compile mlx90640/example.yaml
 external_components:
   - source:
-      type: git
-      url: https://github.com/dephekt/esphome-components
-      path: .
-    components: [mlx90640]
+      type: local
+      path: /config
+    components: [mlx90640, thermal_camera_core]
+
+web_server_base:
+  id: my_web_server_base
 
 # MLX90640 thermal camera, all options are under this
 mlx90640:
@@ -62,17 +71,17 @@ mlx90640:
       name: "ROI Average Temperature"
       accuracy_decimals: 1
 
-  # Auto-generated user controls (optional - all settings persist across reboots!)
+  # Auto-generated user controls (optional - all settings persist across reboots!
+  # restore is always enabled internally for these auto-generated controls, so
+  # there's no `restore_value:` YAML key to set.)
   update_interval_control:
     name: "Thermal Update Interval"
     min_value: 100              # 100ms minimum
     max_value: 30000            # 30 second maximum
     step: 100                   # 100ms increments
-    restore_value: true
 
   thermal_palette_control:
     name: "Thermal Color Palette"
-    restore_value: true
 
   roi_enabled_control:
     name: "ROI Enabled"
@@ -83,21 +92,18 @@ mlx90640:
     min_value: 1
     max_value: 24
     step: 1
-    restore_value: true
 
   roi_center_col_control:
     name: "ROI Center Column"
     min_value: 1
     max_value: 32
     step: 1
-    restore_value: true
 
   roi_size_control:
     name: "ROI Size"
     min_value: 1
     max_value: 10
     step: 1
-    restore_value: true
 
   # This is a switch to enable/disable the web overlay feature
   web_overlay_enabled_control:
@@ -110,14 +116,12 @@ mlx90640:
     min_value: 0.1
     max_value: 1.0
     step: 0.01
-    restore_value: true
 
   reflected_temperature_control:
     name: "Reflected Temperature"
     min_value: -40.0
     max_value: 300.0
     step: 0.5
-    restore_value: true
 
   reflected_temperature_auto_control:
     name: "Reflected Temperature Auto"
@@ -136,3 +140,4 @@ mlx90640:
     path: "/thermal.jpg"        # Access at http://device-ip/thermal.jpg
     quality: 85                 # JPEG quality (10-100)
     overlay_enabled: true       # Enable ROI and temperature overlays on JPEG
+    web_server_base_id: my_web_server_base

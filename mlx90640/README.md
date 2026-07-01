@@ -14,11 +14,14 @@ ESPHome component for the Melexis MLX90640 thermal imaging sensor. Provides temp
 
 See [example.yaml](example.yaml) for a complete working configuration. Copy the relevant sections to your ESPHome config:
 
-- Required empty platform sections (`switch:`, `number:`, `select:`, `sensor:`)
+- `external_components:` — a git source must list both `mlx90640` and its shared
+  base `thermal_camera_core` (a local source picks the base up automatically)
 - `web_server_base:` with an ID
 - `mlx90640:` component with temperature sensors, controls, and web server configuration
 
-The example includes all necessary sensor stubs and control entities that will appear in Home Assistant.
+The sensor/number/select/switch platforms are pulled in automatically via the
+component's `AUTO_LOAD`, so no empty platform stubs are required. The example
+includes all control entities that will appear in Home Assistant.
 
 Access thermal image at `http://device-ip/thermal.jpg`
 
