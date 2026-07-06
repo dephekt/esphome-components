@@ -50,6 +50,12 @@ class EZOSensor : public ezo::EZOSensor {
     last_command_sensor_ = last_command_sensor;
   }
   void set_queue_size_sensor(sensor::Sensor *queue_size_sensor) { queue_size_sensor_ = queue_size_sensor; }
+  void set_recovery_count_sensor(sensor::Sensor *recovery_count_sensor) {
+    recovery_count_sensor_ = recovery_count_sensor;
+  }
+  void set_health_state_sensor(text_sensor::TextSensor *health_state_sensor) {
+    health_state_sensor_ = health_state_sensor;
+  }
 
   // Calibration methods
   void factory_reset();
@@ -76,6 +82,12 @@ class EZOSensor : public ezo::EZOSensor {
   void update_diagnostic_sensors_();
   void send_compensated_read_();
 
+  // Stall watchdog / self-heal
+  void check_stall_watchdog_();
+  void trigger_recovery_(const char *reason);
+  void finish_power_cycle_();
+  bool queue_full_() const { return this->commands_.size() >= MAX_QUEUE_SIZE; }
+
   sensor::Sensor *voltage_sensor_{nullptr};
   text_sensor::TextSensor *reset_reason_sensor_{nullptr};
   text_sensor::TextSensor *firmware_version_sensor_{nullptr};
@@ -93,6 +105,8 @@ class EZOSensor : public ezo::EZOSensor {
   text_sensor::TextSensor *next_command_sensor_{nullptr};
   text_sensor::TextSensor *last_command_sensor_{nullptr};
   sensor::Sensor *queue_size_sensor_{nullptr};
+  sensor::Sensor *recovery_count_sensor_{nullptr};
+  text_sensor::TextSensor *health_state_sensor_{nullptr};
 
   // Switch control state
   bool temp_compensation_enabled_{false};
@@ -104,12 +118,35 @@ class EZOSensor : public ezo::EZOSensor {
   bool initialization_pending_{false};
   static constexpr uint32_t POWER_ON_DELAY_MS = 2000;
 
+  // --- Stall watchdog / self-heal ---
+  // A firmware-locked EZO circuit keeps ACKing its I2C address but returns 0xFE
+  // ("still processing") to every read, so the stock base loop's `case 254:
+  // return;` pins the front command forever. We detect a front command whose age
+  // (millis()-start_time_) exceeds STALL_TIMEOUT_MS while it is command_sent, and
+  // auto power-cycle the circuit via its enable switch to force a POR.
+  static constexpr uint32_t STALL_TIMEOUT_MS = 20000;         // front overdue -> wedged
+  static constexpr uint32_t RECOVERY_OFF_WINDOW_MS = 15000;   // Vcc off long enough to beat parasitic power
+  static constexpr uint8_t MAX_RECOVERY_ATTEMPTS = 3;         // attempts before cooling down
+  static constexpr uint32_t RECOVERY_COOLDOWN_MS = 300000;    // 5 min pause after exhausting attempts
+  static constexpr uint32_t HEALTHY_RESET_MS = 90000;         // sustained readings before clearing attempt counter
+  static constexpr uint32_t POST_RECOVERY_SETTLE_MS = 30000;  // suppress garbage readings after repower
+  static constexpr size_t MAX_QUEUE_SIZE = 20;                // queue backpressure cap
+
+  bool power_cycle_in_progress_{false};
+  uint8_t stall_recovery_count_{0};
+  uint16_t total_recoveries_{0};
+  uint32_t recovery_suspended_until_{0};
+  uint32_t last_recovery_time_{0};
+  uint32_t reading_settle_until_{0};
+
   // Diagnostic state caching to prevent spam
   std::string last_current_command_{""};
   std::string last_next_command_{""};
   std::string last_completed_command_{""};
   std::string last_last_command_{""};
   size_t last_queue_size_{SIZE_MAX};
+  uint16_t last_recovery_count_{UINT16_MAX};
+  std::string last_health_state_{""};
 };
 
 class PHSensor : public EZOSensor {

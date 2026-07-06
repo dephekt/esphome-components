@@ -45,6 +45,8 @@ CONF_CURRENT_COMMAND = "current_command"
 CONF_NEXT_COMMAND = "next_command"
 CONF_LAST_COMMAND = "last_command"
 CONF_QUEUE_SIZE = "queue_size"
+CONF_RECOVERY_COUNT = "recovery_count"
+CONF_HEALTH_STATE = "health_state"
 CONF_RTD_SENSOR = "rtd_sensor"
 CONF_TEMP_COMPENSATION_SWITCH = "temp_compensation_switch"
 CONF_CALIBRATION_MODE_SWITCH = "calibration_mode_switch"
@@ -121,6 +123,22 @@ def _queue_size_schema():
         state_class=STATE_CLASS_MEASUREMENT,
         accuracy_decimals=0,
         icon="mdi:counter",
+    )
+
+
+def _recovery_count_schema():
+    return sensor.sensor_schema(
+        state_class=STATE_CLASS_MEASUREMENT,
+        accuracy_decimals=0,
+        icon="mdi:autorenew",
+        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+    )
+
+
+def _health_state_schema():
+    return text_sensor.text_sensor_schema(
+        icon="mdi:heart-pulse",
+        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
     )
 
 
@@ -221,6 +239,8 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
+                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
+                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
                 cv.Optional(
                     CONF_TEMPERATURE_COMPENSATION
                 ): _temperature_compensation_sensor_schema(),
@@ -259,6 +279,8 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
+                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
+                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
                 cv.Optional(
                     CONF_TEMPERATURE_COMPENSATION
                 ): _temperature_compensation_sensor_schema(),
@@ -295,6 +317,8 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
+                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
+                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
             }
         )
         .extend(cv.polling_component_schema("60s"))
@@ -321,6 +345,8 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
+                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
+                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
                 cv.Optional(CONF_EXTENDED_SCALE): _extended_scale_switch_schema(),
             }
         )
@@ -374,6 +400,14 @@ async def setup_atlas_sensor_base(var, config):
     if queue_size_config := config.get(CONF_QUEUE_SIZE):
         queue_size_sensor = await sensor.new_sensor(queue_size_config)
         cg.add(var.set_queue_size_sensor(queue_size_sensor))
+
+    if recovery_count_config := config.get(CONF_RECOVERY_COUNT):
+        recovery_count_sensor = await sensor.new_sensor(recovery_count_config)
+        cg.add(var.set_recovery_count_sensor(recovery_count_sensor))
+
+    if health_state_config := config.get(CONF_HEALTH_STATE):
+        health_state_sensor = await text_sensor.new_text_sensor(health_state_config)
+        cg.add(var.set_health_state_sensor(health_state_sensor))
 
     if temperature_compensation_config := config.get(CONF_TEMPERATURE_COMPENSATION):
         temperature_compensation_sensor = await sensor.new_sensor(

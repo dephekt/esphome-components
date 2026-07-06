@@ -18,6 +18,23 @@ void EZOSensor::setup() {
   this->add_device_infomation_callback(
       [this](std::string response) { this->parse_device_information_response_(response); });
 
+  // Track successful readings for the stall watchdog: a genuine (non-NaN) main
+  // reading is proof the circuit is alive. Sustained readings after a recovery
+  // clear the attempt counter, but a SINGLE completion must NOT — a re-wedge right
+  // after repower (STATUS answers, then the current-spike read re-locks) would
+  // otherwise reset the counter every cycle and power-cycle forever. STATUS/CAL/
+  // info completions do not publish the main value, so they never fire this.
+  this->add_on_state_callback([this](float x) {
+    if (std::isnan(x)) {
+      return;
+    }
+    if (this->stall_recovery_count_ > 0 && (millis() - this->last_recovery_time_) > HEALTHY_RESET_MS) {
+      ESP_LOGI(TAG, "Circuit stable for %us after recovery; clearing recovery attempt counter",
+               HEALTHY_RESET_MS / 1000);
+      this->stall_recovery_count_ = 0;
+    }
+  });
+
   // Only send initial commands if circuit is powered
   if (this->is_circuit_powered_()) {
     this->send_custom("STATUS");
@@ -29,6 +46,14 @@ void EZOSensor::setup() {
 void EZOSensor::update() {
   // Only send commands if circuit is powered
   if (!this->is_circuit_powered_()) {
+    return;
+  }
+
+  // Backpressure: a wedged circuit whose front command never pops must not balloon
+  // the queue (seen 640+ entries before this guard). Stop enqueueing new polls once
+  // the queue is saturated; the stall watchdog will power-cycle and drain it.
+  if (this->queue_full_()) {
+    this->update_diagnostic_sensors_();
     return;
   }
 
@@ -127,6 +152,12 @@ void EZOSensor::loop() {
       ESP_LOGI(TAG, "Warm-up complete, initializing circuit");
       this->initialization_pending_ = false;
       this->reinitialize();
+      // Warm-up completion (from any power-on, including an auto recovery) re-arms
+      // the watchdog and starts the post-repower settle window. Crucially this
+      // clears power_cycle_in_progress_ here rather than on a successful read, so a
+      // FAILED recovery still advances toward the attempt cap instead of latching
+      // the watchdog off forever.
+      this->finish_power_cycle_();
     }
   }
 
@@ -146,6 +177,10 @@ void EZOSensor::loop() {
 
   // Update diagnostic sensors after processing
   this->update_diagnostic_sensors_();
+
+  // Detect a wedged circuit (front command dispatched but never completing) and
+  // self-heal by power-cycling it.
+  this->check_stall_watchdog_();
 }
 
 void EZOSensor::dump_config_base_(const char *sensor_type) {
@@ -263,8 +298,8 @@ void PHSensor::update() {
   // Call parent update first
   EZOSensor::update();
 
-  // Send temperature compensation query if sensor is configured
-  if (this->temperature_compensation_sensor_) {
+  // Send temperature compensation query if sensor is configured (gated by backpressure)
+  if (this->temperature_compensation_sensor_ && !this->queue_full_()) {
     this->send_custom("T,?");
   }
 
@@ -273,14 +308,18 @@ void PHSensor::update() {
   if ((this->acid_slope_quality_sensor_ || this->alkaline_slope_quality_sensor_ || this->asymmetry_potential_sensor_) &&
       ++slope_counter >= 10) {
     slope_counter = 0;
-    this->get_slope();
+    if (!this->queue_full_()) {
+      this->get_slope();
+    }
   }
 
   // Query calibration status periodically (every 15th update) if sensor is configured
   static uint8_t cal_status_counter = 0;
   if (++cal_status_counter >= 15) {
     cal_status_counter = 0;
-    this->request_calibration_status();
+    if (!this->queue_full_()) {
+      this->request_calibration_status();
+    }
   }
 }
 
@@ -421,8 +460,10 @@ void ECSensor::update() {
   // Call parent update first
   EZOSensor::update();
 
+  // These child appends bypass the parent's read-insertion guard, so they are the
+  // real source of unbounded queue growth during a wedge -- gate each on the cap.
   // Also query the internal temperature compensation value if a sensor is configured
-  if (this->temperature_compensation_sensor_) {
+  if (this->temperature_compensation_sensor_ && !this->queue_full_()) {
     this->send_custom("T,?");
   }
 
@@ -430,14 +471,18 @@ void ECSensor::update() {
   static uint8_t cell_constant_counter = 0;
   if (this->cell_constant_select_ && ++cell_constant_counter >= 10) {
     cell_constant_counter = 0;
-    this->request_cell_constant_query();
+    if (!this->queue_full_()) {
+      this->request_cell_constant_query();
+    }
   }
 
   // Query calibration status periodically (every 15th update) if sensor is configured
   static uint8_t cal_status_counter = 0;
   if (++cal_status_counter >= 15) {
     cal_status_counter = 0;
-    this->request_calibration_status();
+    if (!this->queue_full_()) {
+      this->request_calibration_status();
+    }
   }
 }
 
@@ -502,6 +547,12 @@ void ECSensor::loop() {
           this->commands_.pop_front();
           return;
         case 254:
+          // Still processing. This intercept returns before the base ezo_types
+          // loop where the stall watchdog runs, so run it here too -- otherwise an
+          // EC READ wedged at 0xFE (vs. the STATUS-front wedge on the base path)
+          // would never trigger recovery. start_time_ is frozen at this read's
+          // dispatch, so its age keeps growing until the watchdog fires.
+          this->check_stall_watchdog_();
           return;  // keep waiting
         case 255:
           ESP_LOGE(TAG, "[EC] device returned no data");
@@ -538,6 +589,25 @@ void ECSensor::parse_reading_csv_(const std::string &response) {
     remainder.erase(0, pos + 1);
   }
   fields.push_back(remainder);
+
+  // Suppress the garbage burst a freshly re-powered EZO emits for ~30s (seen
+  // 100k-900k uS/cm): publish NaN so downstream (grow-app dosing) ignores EC/TDS
+  // until it settles, rather than acting on noise. NaN does not count as a healthy
+  // reading, so it never resets the recovery attempt counter.
+  if (millis() < this->reading_settle_until_) {
+    ESP_LOGD(TAG, "[EC] settling after recovery; suppressing reading");
+    this->publish_state(NAN);
+    if (this->tds_sensor_) {
+      this->tds_sensor_->publish_state(NAN);
+    }
+    if (this->salinity_sensor_) {
+      this->salinity_sensor_->publish_state(NAN);
+    }
+    if (this->relative_density_sensor_) {
+      this->relative_density_sensor_->publish_state(NAN);
+    }
+    return;
+  }
 
   // Field 0 is always EC
   if (!fields.empty()) {
@@ -693,7 +763,9 @@ void RTDSensor::update() {
   static uint8_t cal_status_counter = 0;
   if (++cal_status_counter >= 15) {
     cal_status_counter = 0;
-    this->request_calibration_status();
+    if (!this->queue_full_()) {
+      this->request_calibration_status();
+    }
   }
 }
 
@@ -770,7 +842,9 @@ void ORPSensor::update() {
   static uint8_t cal_status_counter = 0;
   if (++cal_status_counter >= 15) {
     cal_status_counter = 0;
-    this->request_calibration_status();
+    if (!this->queue_full_()) {
+      this->request_calibration_status();
+    }
   }
 }
 
@@ -899,6 +973,88 @@ void EZOSensor::send_compensated_read_() {
   this->add_command_(command.c_str(), ezo::EzoCommandType::EZO_READ, 900);
 }
 
+void EZOSensor::check_stall_watchdog_() {
+  // Suppress while a recovery is mid-flight, during the post-cooldown pause, when
+  // unpowered / warming up, and during a user calibration (yanking Vcc mid-cal
+  // would silently abort it).
+  if (this->power_cycle_in_progress_) {
+    return;
+  }
+  if (millis() < this->recovery_suspended_until_) {
+    return;
+  }
+  if (!this->is_circuit_powered_() || this->initialization_pending_) {
+    return;
+  }
+  if (this->calibration_mode_switch_ != nullptr && this->calibration_mode_switch_->state) {
+    return;
+  }
+  if (this->commands_.empty()) {
+    return;
+  }
+
+  // start_time_ (base class) is the dispatch time of the front command and only
+  // advances when a NEW command is sent. Since we only ever send the front, and a
+  // wedged front never pops, millis()-start_time_ is exactly the age of the stuck
+  // head. A healthy command pops within its delay (<=900 ms), so a front older than
+  // STALL_TIMEOUT_MS means the circuit ACKs but never completes -> wedged.
+  auto &front = this->commands_.front();
+  if (!front->command_sent) {
+    return;
+  }
+  if ((millis() - this->start_time_) > STALL_TIMEOUT_MS) {
+    this->trigger_recovery_("front command stuck (no I2C completion)");
+  }
+}
+
+void EZOSensor::trigger_recovery_(const char *reason) {
+  if (this->power_control_switch_ == nullptr) {
+    ESP_LOGE(TAG, "Circuit stalled (%s) but no power_control_switch is configured; cannot self-heal", reason);
+    this->recovery_suspended_until_ = millis() + RECOVERY_COOLDOWN_MS;
+    return;
+  }
+
+  if (this->stall_recovery_count_ >= MAX_RECOVERY_ATTEMPTS) {
+    ESP_LOGE(TAG,
+             "Circuit still stalled (%s) after %u recovery attempts; cooling down %us. Persistent stalls point to a "
+             "hardware fix (isolate the branch's SDA/SCL or bleed the EZO Vdd during the off-window).",
+             reason, this->stall_recovery_count_, RECOVERY_COOLDOWN_MS / 1000);
+    this->recovery_suspended_until_ = millis() + RECOVERY_COOLDOWN_MS;
+    this->stall_recovery_count_ = 0;
+    // Reset the stuck-age clock so we don't immediately re-fire the instant the
+    // cooldown elapses.
+    this->start_time_ = millis();
+    return;
+  }
+
+  this->stall_recovery_count_++;
+  this->total_recoveries_++;
+  this->last_recovery_time_ = millis();
+  this->power_cycle_in_progress_ = true;
+  ESP_LOGW(TAG, "Circuit stalled (%s): auto power-cycling, attempt %u/%u (total recoveries: %u)", reason,
+           this->stall_recovery_count_, MAX_RECOVERY_ATTEMPTS, this->total_recoveries_);
+
+  // Cut Vcc now (the next loop tick's power-OFF branch clears the queue), then
+  // re-power after the off-window. turn_on's power-ON branch arms the existing 2s
+  // warm-up, whose completion calls finish_power_cycle_().
+  this->power_control_switch_->turn_off();
+  this->set_timeout("ezo_recover", RECOVERY_OFF_WINDOW_MS, [this]() {
+    ESP_LOGI(TAG, "Recovery off-window elapsed; re-powering circuit");
+    this->power_control_switch_->turn_on();
+  });
+}
+
+void EZOSensor::finish_power_cycle_() {
+  // Suppress the garbage burst a freshly re-powered EZO emits (seen 100k-900k
+  // uS/cm for ~30s) so downstream consumers ignore EC until it settles.
+  this->reading_settle_until_ = millis() + POST_RECOVERY_SETTLE_MS;
+  if (this->power_cycle_in_progress_) {
+    this->power_cycle_in_progress_ = false;
+    ESP_LOGI(TAG, "Power-cycle recovery: warm-up complete, watchdog re-armed (settling %us)",
+             POST_RECOVERY_SETTLE_MS / 1000);
+  }
+}
+
 void EZOSensor::update_diagnostic_sensors_() {
   // Update queue size (only if changed)
   if (this->queue_size_sensor_) {
@@ -1019,6 +1175,35 @@ void EZOSensor::update_diagnostic_sensors_() {
     if (last_cmd_info != this->last_last_command_) {
       this->last_command_sensor_->publish_state(last_cmd_info);
       this->last_last_command_ = last_cmd_info;
+    }
+  }
+
+  // Lifetime auto-recovery count (only if changed)
+  if (this->recovery_count_sensor_ && this->total_recoveries_ != this->last_recovery_count_) {
+    this->recovery_count_sensor_->publish_state(this->total_recoveries_);
+    this->last_recovery_count_ = this->total_recoveries_;
+  }
+
+  // Health state (only if changed)
+  if (this->health_state_sensor_) {
+    std::string health;
+    if (this->power_cycle_in_progress_) {
+      health = "RECOVERING";
+    } else if (millis() < this->reading_settle_until_) {
+      health = "SETTLING";
+    } else if (millis() < this->recovery_suspended_until_) {
+      health = "SUSPENDED";
+    } else if (!this->is_circuit_powered_()) {
+      health = "OFF";
+    } else if (!this->commands_.empty() && this->commands_.front()->command_sent &&
+               (millis() - this->start_time_) > STALL_TIMEOUT_MS) {
+      health = "STALLED";
+    } else {
+      health = "OK";
+    }
+    if (health != this->last_health_state_) {
+      this->health_state_sensor_->publish_state(health);
+      this->last_health_state_ = health;
     }
   }
 }
