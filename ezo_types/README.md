@@ -1,10 +1,15 @@
 # EZO Types Component
 
 A typed, batteries-included ESPHome component for **Atlas Scientific EZO** circuits
-(pH, EC/conductivity, RTD/temperature, ORP). It extends the stock `ezo` component
-(via `AUTO_LOAD: ["ezo"]`) and adds first-class entities for the things the bare
-`ezo` platform leaves you to wire up by hand: calibration, temperature
-compensation, cell constant, TDS, and per-circuit diagnostics.
+(pH, EC/conductivity, RTD/temperature, ORP). It vendors the stock `ezo` command
+state machine (`ezo_base.{h,cpp}`, GPL per the ESPHome license — see LICENSE) with
+one behavioral fix: commands have a bounded deadline, so a circuit that answers
+254 ("still processing") forever gets its command dropped instead of wedging the
+queue permanently, and after three consecutive failed reads the sensor publishes
+NaN (unavailable) rather than holding a stale value. On top of that it adds
+first-class entities for the things the bare `ezo` platform leaves you to wire up
+by hand: calibration, temperature compensation, cell constant, TDS, and
+per-circuit diagnostics.
 
 Each circuit `type` is its own self-contained universe — the component is generic
 and makes no application-specific assumptions. Opinionation (which probe
@@ -29,7 +34,9 @@ not in the component.
 
 - `i2c` — the EZO circuits are I²C devices.
 - `select`, `switch` — used by the component-owned config entities.
-- `ezo` — auto-loaded; provides the underlying `EZOSensor` C++ base.
+
+The stock `ezo` component is **not** used; the command state machine is vendored
+into this component (see above).
 
 ## Basic configuration
 

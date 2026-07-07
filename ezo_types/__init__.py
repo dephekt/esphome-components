@@ -1,7 +1,6 @@
 import esphome.codegen as cg
 
 CODEOWNERS = ["@dephekt"]
-AUTO_LOAD = ["ezo"]
 DEPENDENCIES = ["i2c"]
 MULTI_CONF = True
 

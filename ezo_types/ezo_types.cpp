@@ -13,27 +13,9 @@ static const char *const STATUS_PREFIX = "?STATUS,";
 static const char *const CAL_PREFIX = "?CAL,";
 
 void EZOSensor::setup() {
-  ezo::EZOSensor::setup();
   this->add_custom_callback([this](std::string response) { this->handle_custom_response_(response); });
   this->add_device_infomation_callback(
       [this](std::string response) { this->parse_device_information_response_(response); });
-
-  // Track successful readings for the stall watchdog: a genuine (non-NaN) main
-  // reading is proof the circuit is alive. Sustained readings after a recovery
-  // clear the attempt counter, but a SINGLE completion must NOT — a re-wedge right
-  // after repower (STATUS answers, then the current-spike read re-locks) would
-  // otherwise reset the counter every cycle and power-cycle forever. STATUS/CAL/
-  // info completions do not publish the main value, so they never fire this.
-  this->add_on_state_callback([this](float x) {
-    if (std::isnan(x)) {
-      return;
-    }
-    if (this->stall_recovery_count_ > 0 && (millis() - this->last_recovery_time_) > HEALTHY_RESET_MS) {
-      ESP_LOGI(TAG, "Circuit stable for %us after recovery; clearing recovery attempt counter",
-               HEALTHY_RESET_MS / 1000);
-      this->stall_recovery_count_ = 0;
-    }
-  });
 
   // Only send initial commands if circuit is powered
   if (this->is_circuit_powered_()) {
@@ -49,33 +31,33 @@ void EZOSensor::update() {
     return;
   }
 
-  // Backpressure: a wedged circuit whose front command never pops must not balloon
-  // the queue (seen 640+ entries before this guard). Stop enqueueing new polls once
-  // the queue is saturated; the stall watchdog will power-cycle and drain it.
+  // Backpressure: a slow or dead circuit must not balloon the queue (seen 640+
+  // entries before this guard). Stop enqueueing new polls once the queue is
+  // saturated; the per-command deadline in the base loop keeps it draining.
   if (this->queue_full_()) {
     this->update_diagnostic_sensors_();
     return;
   }
 
-  // Implement the parent's read command logic with power control
-  // This replaces ezo::EZOSensor::update() to prevent power control bypass
+  // Implement the base read command logic with power control
+  // This replaces EZOSensorBase::update() to prevent power control bypass
 
   // Check if a read is in there already and if not insert one in the second position
-  if (!this->commands_.empty() && this->commands_.front()->command_type != ezo::EzoCommandType::EZO_READ &&
+  if (!this->commands_.empty() && this->commands_.front()->command_type != EzoCommandType::EZO_READ &&
       this->commands_.size() > 1) {
     bool found = false;
 
     for (auto &i : this->commands_) {
-      if (i->command_type == ezo::EzoCommandType::EZO_READ) {
+      if (i->command_type == EzoCommandType::EZO_READ) {
         found = true;
         break;
       }
     }
 
     if (!found) {
-      std::unique_ptr<ezo::EzoCommand> ezo_command(new ezo::EzoCommand);
+      std::unique_ptr<EzoCommand> ezo_command(new EzoCommand);
       ezo_command->command = "R";
-      ezo_command->command_type = ezo::EzoCommandType::EZO_READ;
+      ezo_command->command_type = EzoCommandType::EZO_READ;
       ezo_command->delay_ms = 900;
 
       auto it = this->commands_.begin();
@@ -88,15 +70,17 @@ void EZOSensor::update() {
 
   this->send_compensated_read_();
 
-  // Send STATUS command periodically to update voltage and reset reason (only if sensors configured)
-  if (this->voltage_sensor_ || this->reset_reason_sensor_) {
+  // Query STATUS (voltage / reset reason) periodically rather than every poll —
+  // it changes rarely and every extra command is bus traffic while a sibling
+  // circuit may be mid-measurement.
+  if ((this->voltage_sensor_ || this->reset_reason_sensor_) && ++this->status_query_counter_ >= STATUS_QUERY_INTERVAL) {
+    this->status_query_counter_ = 0;
     this->send_custom("STATUS");
   }
 
   // Send device info query occasionally
-  static uint8_t device_info_counter = 0;
-  if (++device_info_counter >= 10) {
-    device_info_counter = 0;
+  if (++this->device_info_query_counter_ >= DEVICE_INFO_QUERY_INTERVAL) {
+    this->device_info_query_counter_ = 0;
     this->get_device_information();
   }
 
@@ -112,7 +96,7 @@ void EZOSensor::loop() {
       // Calibration mode was just turned ON
       ESP_LOGI(TAG, "Calibration mode ON. Clearing queue and setting temperature compensation to 25.0°C");
       this->commands_.clear();
-      this->add_command_("T,25.0", ezo::EzoCommandType::EZO_T, 300);
+      this->add_command_("T,25.0", EzoCommandType::EZO_T, 300);
     }
     this->last_calibration_mode_state_ = current_cal_mode_state;
   }
@@ -152,12 +136,6 @@ void EZOSensor::loop() {
       ESP_LOGI(TAG, "Warm-up complete, initializing circuit");
       this->initialization_pending_ = false;
       this->reinitialize();
-      // Warm-up completion (from any power-on, including an auto recovery) re-arms
-      // the watchdog and starts the post-repower settle window. Crucially this
-      // clears power_cycle_in_progress_ here rather than on a successful read, so a
-      // FAILED recovery still advances toward the attempt cap instead of latching
-      // the watchdog off forever.
-      this->finish_power_cycle_();
     }
   }
 
@@ -168,7 +146,7 @@ void EZOSensor::loop() {
     current_command_before = this->commands_.front()->command;
   }
 
-  ezo::EZOSensor::loop();
+  EZOSensorBase::loop();
 
   // Check if a command was completed (queue size decreased and it was the same command)
   if (commands_before > 0 && this->commands_.size() < commands_before && !current_command_before.empty()) {
@@ -177,10 +155,6 @@ void EZOSensor::loop() {
 
   // Update diagnostic sensors after processing
   this->update_diagnostic_sensors_();
-
-  // Detect a wedged circuit (front command dispatched but never completing) and
-  // self-heal by power-cycling it.
-  this->check_stall_watchdog_();
 }
 
 void EZOSensor::dump_config_base_(const char *sensor_type) {
@@ -448,10 +422,10 @@ void ECSensor::setup() {
   // Enable/disable outputs to match configured sub-sensors so the R CSV order is deterministic.
   // EC is always enabled; TDS/SAL/SG mirror whether the sub-sensor is wired.
   if (this->is_circuit_powered_()) {
-    this->add_command_("O,EC,1", ezo::EzoCommandType::EZO_CUSTOM, 300);
-    this->add_command_(this->tds_sensor_ ? "O,TDS,1" : "O,TDS,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
-    this->add_command_(this->salinity_sensor_ ? "O,S,1" : "O,S,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
-    this->add_command_(this->relative_density_sensor_ ? "O,SG,1" : "O,SG,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_("O,EC,1", EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_(this->tds_sensor_ ? "O,TDS,1" : "O,TDS,0", EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_(this->salinity_sensor_ ? "O,S,1" : "O,S,0", EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_(this->relative_density_sensor_ ? "O,SG,1" : "O,SG,0", EzoCommandType::EZO_CUSTOM, 300);
   }
   // Cell constant query will be requested by the select component's setup() method
 }
@@ -496,12 +470,12 @@ void ECSensor::dump_config() {
   }
 }
 
-void ECSensor::set_calibration_point_dry() { this->add_command_("Cal,dry", ezo::EzoCommandType::EZO_CUSTOM, 600); }
+void ECSensor::set_calibration_point_dry() { this->add_command_("Cal,dry", EzoCommandType::EZO_CUSTOM, 600); }
 
 void ECSensor::set_cell_constant(const std::string &value) {
   char command[16];
   snprintf(command, sizeof(command), "K,%s", value.c_str());
-  this->add_command_(command, ezo::EzoCommandType::EZO_CUSTOM, 300);
+  this->add_command_(command, EzoCommandType::EZO_CUSTOM, 300);
 }
 
 void ECSensor::request_cell_constant_query() {
@@ -520,61 +494,30 @@ void ECSensor::request_tds_query() {
 
 void ECSensor::set_tds_conversion_factor(float factor) {
   std::string cmd = "TDS," + to_string(factor);
-  this->add_command_(cmd.c_str(), ezo::EzoCommandType::EZO_CUSTOM, 300);
+  this->add_command_(cmd.c_str(), EzoCommandType::EZO_CUSTOM, 300);
 }
 
-void ECSensor::loop() {
-  // When sub-sensors are configured we need the full CSV from the R response before
-  // ezo::EZOSensor::loop() truncates it at the first comma.  Intercept EZO_READ commands
-  // that are ready to be read and parse the raw I2C bytes ourselves.
-  if ((this->tds_sensor_ || this->salinity_sensor_ || this->relative_density_sensor_) &&
-      !this->commands_.empty()) {
-    auto *front = this->commands_.front().get();
-    if (front->command_type == ezo::EzoCommandType::EZO_READ && front->command_sent &&
-        (millis() - this->start_time_ >= front->delay_ms)) {
-      uint8_t buf[64];
-      buf[0] = 0;
-      if (!this->read_bytes_raw(buf, sizeof(buf))) {
-        ESP_LOGE(TAG, "[EC] read error");
-        this->commands_.pop_front();
-        return;
-      }
-      switch (buf[0]) {
-        case 1:
-          break;
-        case 2:
-          ESP_LOGE(TAG, "[EC] device returned a syntax error");
-          this->commands_.pop_front();
-          return;
-        case 254:
-          // Still processing. This intercept returns before the base ezo_types
-          // loop where the stall watchdog runs, so run it here too -- otherwise an
-          // EC READ wedged at 0xFE (vs. the STATUS-front wedge on the base path)
-          // would never trigger recovery. start_time_ is frozen at this read's
-          // dispatch, so its age keeps growing until the watchdog fires.
-          this->check_stall_watchdog_();
-          return;  // keep waiting
-        case 255:
-          ESP_LOGE(TAG, "[EC] device returned no data");
-          this->commands_.pop_front();
-          return;
-        default:
-          ESP_LOGE(TAG, "[EC] device returned unknown response: %d", buf[0]);
-          this->commands_.pop_front();
-          return;
-      }
-      std::string payload = reinterpret_cast<char *>(&buf[1]);
-      this->commands_.pop_front();
-      // Log completion so the diagnostic tracking in the parent loop() picks it up
-      this->last_completed_command_ = "R";
-      this->parse_reading_csv_(payload);
-      // Continue with the rest of the queue via the parent (not calling ezo:: directly again)
-      ezo_types::EZOSensor::loop();
-      return;
-    }
+void ECSensor::handle_read_payload_(const std::string &payload) {
+  // With sub-sensors configured the R response is a CSV of the enabled outputs;
+  // parse all fields instead of the base behavior (truncate at first comma).
+  if (this->tds_sensor_ || this->salinity_sensor_ || this->relative_density_sensor_) {
+    this->parse_reading_csv_(payload);
+    return;
   }
-  // Default path: delegate to the ezo_types base loop (power/warm-up logic + ezo base loop)
-  ezo_types::EZOSensor::loop();
+  EZOSensorBase::handle_read_payload_(payload);
+}
+
+void ECSensor::publish_read_failure_() {
+  EZOSensorBase::publish_read_failure_();
+  if (this->tds_sensor_) {
+    this->tds_sensor_->publish_state(NAN);
+  }
+  if (this->salinity_sensor_) {
+    this->salinity_sensor_->publish_state(NAN);
+  }
+  if (this->relative_density_sensor_) {
+    this->relative_density_sensor_->publish_state(NAN);
+  }
 }
 
 void ECSensor::parse_reading_csv_(const std::string &response) {
@@ -589,25 +532,6 @@ void ECSensor::parse_reading_csv_(const std::string &response) {
     remainder.erase(0, pos + 1);
   }
   fields.push_back(remainder);
-
-  // Suppress the garbage burst a freshly re-powered EZO emits for ~30s (seen
-  // 100k-900k uS/cm): publish NaN so downstream (grow-app dosing) ignores EC/TDS
-  // until it settles, rather than acting on noise. NaN does not count as a healthy
-  // reading, so it never resets the recovery attempt counter.
-  if (millis() < this->reading_settle_until_) {
-    ESP_LOGD(TAG, "[EC] settling after recovery; suppressing reading");
-    this->publish_state(NAN);
-    if (this->tds_sensor_) {
-      this->tds_sensor_->publish_state(NAN);
-    }
-    if (this->salinity_sensor_) {
-      this->salinity_sensor_->publish_state(NAN);
-    }
-    if (this->relative_density_sensor_) {
-      this->relative_density_sensor_->publish_state(NAN);
-    }
-    return;
-  }
 
   // Field 0 is always EC
   if (!fields.empty()) {
@@ -901,7 +825,7 @@ void ORPSensor::parse_extended_scale_response_(const std::string &response) {
 }
 
 void ORPSensor::set_extended_scale(bool enabled) {
-  this->add_command_(enabled ? "ORPext,1" : "ORPext,0", ezo::EzoCommandType::EZO_CUSTOM, 300);
+  this->add_command_(enabled ? "ORPext,1" : "ORPext,0", EzoCommandType::EZO_CUSTOM, 300);
 }
 
 void ORPSensor::request_extended_scale_query() {
@@ -946,113 +870,25 @@ void EZOSensor::reinitialize() {
 
 void EZOSensor::request_calibration_status() {
   if (this->is_circuit_powered_() && this->calibration_status_sensor_) {
-    this->add_command_("CAL,?", ezo::EzoCommandType::EZO_CUSTOM, 300);
+    this->add_command_("CAL,?", EzoCommandType::EZO_CUSTOM, 300);
     ESP_LOGD(TAG, "Requesting calibration status");
   }
 }
 
 void EZOSensor::send_compensated_read_() {
-  std::string command = "R";  // Default to a normal read
-
   bool calibration_mode = this->calibration_mode_switch_ != nullptr && this->calibration_mode_switch_->state;
   bool temp_comp_enabled = this->temp_compensation_switch_ != nullptr && this->temp_compensation_switch_->state;
 
-  if (calibration_mode) {
-    // During calibration, we only send standard "R" commands.
-    // The temperature is set once when calibration mode is enabled.
-    command = "R";
-  } else if (temp_comp_enabled && this->rtd_sensor_ != nullptr &&
-             !std::isnan(this->rtd_sensor_->last_known_temperature_)) {
-    // If temp comp is on and we have a valid temperature, use it
-    char temp_str[16];
-    snprintf(temp_str, sizeof(temp_str), "%.2f", this->rtd_sensor_->last_known_temperature_);
-    command = "RT," + std::string(temp_str);
+  // Atlas's reference firmware sets compensation with a separate "T,n" (RAM-only
+  // since EC firmware v1.1) followed by a plain "R". The combined "RT,n" needs EC
+  // firmware >= v2.13; this flow works on every version. During calibration the
+  // temperature was set once when calibration mode was enabled.
+  if (!calibration_mode && temp_comp_enabled && this->rtd_sensor_ != nullptr &&
+      !std::isnan(this->rtd_sensor_->last_known_temperature_)) {
+    this->set_t(this->rtd_sensor_->last_known_temperature_);
   }
 
-  // Add the command to the queue
-  this->add_command_(command.c_str(), ezo::EzoCommandType::EZO_READ, 900);
-}
-
-void EZOSensor::check_stall_watchdog_() {
-  // Suppress while a recovery is mid-flight, during the post-cooldown pause, when
-  // unpowered / warming up, and during a user calibration (yanking Vcc mid-cal
-  // would silently abort it).
-  if (this->power_cycle_in_progress_) {
-    return;
-  }
-  if (millis() < this->recovery_suspended_until_) {
-    return;
-  }
-  if (!this->is_circuit_powered_() || this->initialization_pending_) {
-    return;
-  }
-  if (this->calibration_mode_switch_ != nullptr && this->calibration_mode_switch_->state) {
-    return;
-  }
-  if (this->commands_.empty()) {
-    return;
-  }
-
-  // start_time_ (base class) is the dispatch time of the front command and only
-  // advances when a NEW command is sent. Since we only ever send the front, and a
-  // wedged front never pops, millis()-start_time_ is exactly the age of the stuck
-  // head. A healthy command pops within its delay (<=900 ms), so a front older than
-  // STALL_TIMEOUT_MS means the circuit ACKs but never completes -> wedged.
-  auto &front = this->commands_.front();
-  if (!front->command_sent) {
-    return;
-  }
-  if ((millis() - this->start_time_) > STALL_TIMEOUT_MS) {
-    this->trigger_recovery_("front command stuck (no I2C completion)");
-  }
-}
-
-void EZOSensor::trigger_recovery_(const char *reason) {
-  if (this->power_control_switch_ == nullptr) {
-    ESP_LOGE(TAG, "Circuit stalled (%s) but no power_control_switch is configured; cannot self-heal", reason);
-    this->recovery_suspended_until_ = millis() + RECOVERY_COOLDOWN_MS;
-    return;
-  }
-
-  if (this->stall_recovery_count_ >= MAX_RECOVERY_ATTEMPTS) {
-    ESP_LOGE(TAG,
-             "Circuit still stalled (%s) after %u recovery attempts; cooling down %us. Persistent stalls point to a "
-             "hardware fix (isolate the branch's SDA/SCL or bleed the EZO Vdd during the off-window).",
-             reason, this->stall_recovery_count_, RECOVERY_COOLDOWN_MS / 1000);
-    this->recovery_suspended_until_ = millis() + RECOVERY_COOLDOWN_MS;
-    this->stall_recovery_count_ = 0;
-    // Reset the stuck-age clock so we don't immediately re-fire the instant the
-    // cooldown elapses.
-    this->start_time_ = millis();
-    return;
-  }
-
-  this->stall_recovery_count_++;
-  this->total_recoveries_++;
-  this->last_recovery_time_ = millis();
-  this->power_cycle_in_progress_ = true;
-  ESP_LOGW(TAG, "Circuit stalled (%s): auto power-cycling, attempt %u/%u (total recoveries: %u)", reason,
-           this->stall_recovery_count_, MAX_RECOVERY_ATTEMPTS, this->total_recoveries_);
-
-  // Cut Vcc now (the next loop tick's power-OFF branch clears the queue), then
-  // re-power after the off-window. turn_on's power-ON branch arms the existing 2s
-  // warm-up, whose completion calls finish_power_cycle_().
-  this->power_control_switch_->turn_off();
-  this->set_timeout("ezo_recover", RECOVERY_OFF_WINDOW_MS, [this]() {
-    ESP_LOGI(TAG, "Recovery off-window elapsed; re-powering circuit");
-    this->power_control_switch_->turn_on();
-  });
-}
-
-void EZOSensor::finish_power_cycle_() {
-  // Suppress the garbage burst a freshly re-powered EZO emits (seen 100k-900k
-  // uS/cm for ~30s) so downstream consumers ignore EC until it settles.
-  this->reading_settle_until_ = millis() + POST_RECOVERY_SETTLE_MS;
-  if (this->power_cycle_in_progress_) {
-    this->power_cycle_in_progress_ = false;
-    ESP_LOGI(TAG, "Power-cycle recovery: warm-up complete, watchdog re-armed (settling %us)",
-             POST_RECOVERY_SETTLE_MS / 1000);
-  }
+  this->add_command_("R", EzoCommandType::EZO_READ, 900);
 }
 
 void EZOSensor::update_diagnostic_sensors_() {
@@ -1080,31 +916,31 @@ void EZOSensor::update_diagnostic_sensors_() {
       auto &current_cmd = this->commands_.front();
       current_cmd_info = current_cmd->command + " (";
       switch (current_cmd->command_type) {
-        case ezo::EzoCommandType::EZO_READ:
+        case EzoCommandType::EZO_READ:
           current_cmd_info += "READ";
           break;
-        case ezo::EzoCommandType::EZO_CUSTOM:
+        case EzoCommandType::EZO_CUSTOM:
           current_cmd_info += "CUSTOM";
           break;
-        case ezo::EzoCommandType::EZO_CALIBRATION:
+        case EzoCommandType::EZO_CALIBRATION:
           current_cmd_info += "CAL";
           break;
-        case ezo::EzoCommandType::EZO_T:
+        case EzoCommandType::EZO_T:
           current_cmd_info += "TEMP";
           break;
-        case ezo::EzoCommandType::EZO_LED:
+        case EzoCommandType::EZO_LED:
           current_cmd_info += "LED";
           break;
-        case ezo::EzoCommandType::EZO_DEVICE_INFORMATION:
+        case EzoCommandType::EZO_DEVICE_INFORMATION:
           current_cmd_info += "INFO";
           break;
-        case ezo::EzoCommandType::EZO_SLOPE:
+        case EzoCommandType::EZO_SLOPE:
           current_cmd_info += "SLOPE";
           break;
-        case ezo::EzoCommandType::EZO_SLEEP:
+        case EzoCommandType::EZO_SLEEP:
           current_cmd_info += "SLEEP";
           break;
-        case ezo::EzoCommandType::EZO_I2C:
+        case EzoCommandType::EZO_I2C:
           current_cmd_info += "I2C";
           break;
         default:
@@ -1130,31 +966,31 @@ void EZOSensor::update_diagnostic_sensors_() {
       auto &next_cmd = *it;
       next_cmd_info = next_cmd->command + " (";
       switch (next_cmd->command_type) {
-        case ezo::EzoCommandType::EZO_READ:
+        case EzoCommandType::EZO_READ:
           next_cmd_info += "READ";
           break;
-        case ezo::EzoCommandType::EZO_CUSTOM:
+        case EzoCommandType::EZO_CUSTOM:
           next_cmd_info += "CUSTOM";
           break;
-        case ezo::EzoCommandType::EZO_CALIBRATION:
+        case EzoCommandType::EZO_CALIBRATION:
           next_cmd_info += "CAL";
           break;
-        case ezo::EzoCommandType::EZO_T:
+        case EzoCommandType::EZO_T:
           next_cmd_info += "TEMP";
           break;
-        case ezo::EzoCommandType::EZO_LED:
+        case EzoCommandType::EZO_LED:
           next_cmd_info += "LED";
           break;
-        case ezo::EzoCommandType::EZO_DEVICE_INFORMATION:
+        case EzoCommandType::EZO_DEVICE_INFORMATION:
           next_cmd_info += "INFO";
           break;
-        case ezo::EzoCommandType::EZO_SLOPE:
+        case EzoCommandType::EZO_SLOPE:
           next_cmd_info += "SLOPE";
           break;
-        case ezo::EzoCommandType::EZO_SLEEP:
+        case EzoCommandType::EZO_SLEEP:
           next_cmd_info += "SLEEP";
           break;
-        case ezo::EzoCommandType::EZO_I2C:
+        case EzoCommandType::EZO_I2C:
           next_cmd_info += "I2C";
           break;
         default:
@@ -1175,35 +1011,6 @@ void EZOSensor::update_diagnostic_sensors_() {
     if (last_cmd_info != this->last_last_command_) {
       this->last_command_sensor_->publish_state(last_cmd_info);
       this->last_last_command_ = last_cmd_info;
-    }
-  }
-
-  // Lifetime auto-recovery count (only if changed)
-  if (this->recovery_count_sensor_ && this->total_recoveries_ != this->last_recovery_count_) {
-    this->recovery_count_sensor_->publish_state(this->total_recoveries_);
-    this->last_recovery_count_ = this->total_recoveries_;
-  }
-
-  // Health state (only if changed)
-  if (this->health_state_sensor_) {
-    std::string health;
-    if (this->power_cycle_in_progress_) {
-      health = "RECOVERING";
-    } else if (millis() < this->reading_settle_until_) {
-      health = "SETTLING";
-    } else if (millis() < this->recovery_suspended_until_) {
-      health = "SUSPENDED";
-    } else if (!this->is_circuit_powered_()) {
-      health = "OFF";
-    } else if (!this->commands_.empty() && this->commands_.front()->command_sent &&
-               (millis() - this->start_time_) > STALL_TIMEOUT_MS) {
-      health = "STALLED";
-    } else {
-      health = "OK";
-    }
-    if (health != this->last_health_state_) {
-      this->health_state_sensor_->publish_state(health);
-      this->last_health_state_ = health;
     }
   }
 }

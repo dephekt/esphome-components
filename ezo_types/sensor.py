@@ -25,7 +25,6 @@ from .switch import (
 )
 
 CODEOWNERS = ["@dephekt"]
-AUTO_LOAD = ["ezo"]
 DEPENDENCIES = ["i2c", "select", "switch"]
 
 CONF_TYPE = "type"
@@ -45,23 +44,21 @@ CONF_CURRENT_COMMAND = "current_command"
 CONF_NEXT_COMMAND = "next_command"
 CONF_LAST_COMMAND = "last_command"
 CONF_QUEUE_SIZE = "queue_size"
-CONF_RECOVERY_COUNT = "recovery_count"
-CONF_HEALTH_STATE = "health_state"
 CONF_RTD_SENSOR = "rtd_sensor"
 CONF_TEMP_COMPENSATION_SWITCH = "temp_compensation_switch"
 CONF_CALIBRATION_MODE_SWITCH = "calibration_mode_switch"
 
 
-# Bind the stock `ezo` codegen handles locally instead of importing them from
-# `esphome.components.ezo` (which would require patching esphome core). The C++
-# types come from the stock ezo component, pulled in via AUTO_LOAD=["ezo"].
-# Note: stock ezo has no SlopeTrigger class; on_slope uses the CallbackAutomation
-# pattern via add_slope_callback instead.
-ezo_ns = cg.esphome_ns.namespace("ezo")
-EZOSensor = ezo_ns.class_("EZOSensor", sensor.Sensor, cg.PollingComponent, i2c.I2CDevice)
+# The EZO command/state machine is vendored into this component (ezo_base.h),
+# so everything lives in the ezo_types namespace — the stock `ezo` component is
+# not loaded at all. Note: on_slope uses the CallbackAutomation pattern via
+# add_slope_callback (there is no SlopeTrigger class).
 CONF_ON_SLOPE = "on_slope"
 
 ezo_types_ns = cg.esphome_ns.namespace("ezo_types")
+EZOSensor = ezo_types_ns.class_(
+    "EZOSensor", sensor.Sensor, cg.PollingComponent, i2c.I2CDevice
+)
 
 PHSensor = ezo_types_ns.class_("PHSensor", EZOSensor)
 ECSensor = ezo_types_ns.class_("ECSensor", EZOSensor)
@@ -123,22 +120,6 @@ def _queue_size_schema():
         state_class=STATE_CLASS_MEASUREMENT,
         accuracy_decimals=0,
         icon="mdi:counter",
-    )
-
-
-def _recovery_count_schema():
-    return sensor.sensor_schema(
-        state_class=STATE_CLASS_MEASUREMENT,
-        accuracy_decimals=0,
-        icon="mdi:autorenew",
-        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-    )
-
-
-def _health_state_schema():
-    return text_sensor.text_sensor_schema(
-        icon="mdi:heart-pulse",
-        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
     )
 
 
@@ -239,8 +220,6 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
-                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
-                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
                 cv.Optional(
                     CONF_TEMPERATURE_COMPENSATION
                 ): _temperature_compensation_sensor_schema(),
@@ -279,8 +258,6 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
-                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
-                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
                 cv.Optional(
                     CONF_TEMPERATURE_COMPENSATION
                 ): _temperature_compensation_sensor_schema(),
@@ -317,8 +294,6 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
-                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
-                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
             }
         )
         .extend(cv.polling_component_schema("60s"))
@@ -345,8 +320,6 @@ CONFIG_SCHEMA = cv.typed_schema(
                 cv.Optional(CONF_NEXT_COMMAND): _next_command_schema(),
                 cv.Optional(CONF_LAST_COMMAND): _last_command_schema(),
                 cv.Optional(CONF_QUEUE_SIZE): _queue_size_schema(),
-                cv.Optional(CONF_RECOVERY_COUNT): _recovery_count_schema(),
-                cv.Optional(CONF_HEALTH_STATE): _health_state_schema(),
                 cv.Optional(CONF_EXTENDED_SCALE): _extended_scale_switch_schema(),
             }
         )
@@ -400,14 +373,6 @@ async def setup_atlas_sensor_base(var, config):
     if queue_size_config := config.get(CONF_QUEUE_SIZE):
         queue_size_sensor = await sensor.new_sensor(queue_size_config)
         cg.add(var.set_queue_size_sensor(queue_size_sensor))
-
-    if recovery_count_config := config.get(CONF_RECOVERY_COUNT):
-        recovery_count_sensor = await sensor.new_sensor(recovery_count_config)
-        cg.add(var.set_recovery_count_sensor(recovery_count_sensor))
-
-    if health_state_config := config.get(CONF_HEALTH_STATE):
-        health_state_sensor = await text_sensor.new_text_sensor(health_state_config)
-        cg.add(var.set_health_state_sensor(health_state_sensor))
 
     if temperature_compensation_config := config.get(CONF_TEMPERATURE_COMPENSATION):
         temperature_compensation_sensor = await sensor.new_sensor(
