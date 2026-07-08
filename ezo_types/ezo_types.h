@@ -95,6 +95,12 @@ class EZOSensor : public EZOSensorBase {
   bool initialization_pending_{false};
   static constexpr uint32_t POWER_ON_DELAY_MS = 2000;
 
+  // Poll fast while the calibration-mode switch is on so the user gets near
+  // real-time feedback swirling the probe in calibration solution; the
+  // configured update_interval is restored when calibration mode ends.
+  static constexpr uint32_t CAL_MODE_UPDATE_INTERVAL_MS = 2000;
+  uint32_t normal_update_interval_{0};
+
   // Queue backpressure cap: a dead circuit fails its commands within
   // delay+grace each, but update() must still never outrun the drain rate.
   static constexpr size_t MAX_QUEUE_SIZE = 20;

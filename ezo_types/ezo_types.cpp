@@ -97,6 +97,21 @@ void EZOSensor::loop() {
       ESP_LOGI(TAG, "Calibration mode ON. Clearing queue and setting temperature compensation to 25.0°C");
       this->commands_.clear();
       this->add_command_("T,25.0", EzoCommandType::EZO_T, 300);
+      // Fast polling for live feedback while the probe sits in cal solution
+      this->normal_update_interval_ = this->get_update_interval();
+      this->set_update_interval(CAL_MODE_UPDATE_INTERVAL_MS);
+      this->stop_poller();
+      this->start_poller();
+      ESP_LOGI(TAG, "Calibration polling: %ums (was %ums)", CAL_MODE_UPDATE_INTERVAL_MS,
+               this->normal_update_interval_);
+    } else if (!current_cal_mode_state && this->last_calibration_mode_state_) {
+      // Calibration mode was just turned OFF - restore the configured cadence
+      if (this->normal_update_interval_ > 0) {
+        this->set_update_interval(this->normal_update_interval_);
+        this->stop_poller();
+        this->start_poller();
+        ESP_LOGI(TAG, "Calibration mode OFF. Restoring %ums polling", this->normal_update_interval_);
+      }
     }
     this->last_calibration_mode_state_ = current_cal_mode_state;
   }
