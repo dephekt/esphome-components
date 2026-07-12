@@ -16,9 +16,9 @@ namespace mlx90640 {
 // inherited from ThermalCameraBase.
 class MLX90640Component : public thermal_camera_core::ThermalCameraBase {
  public:
-  // The bare sensor's usable range is narrower than the base default (300);
-  // keep the historical -40..85°C validity band.
-  MLX90640Component() { this->temp_valid_max_ = 85.0f; }
+  // The MLX90640 measures object temperatures over -40..300°C (datasheet
+  // §11.2.2.9); inherit the base's full-range validity band so hot targets
+  // above 85°C aren't silently dropped from the stats and color scale.
 
   // Configuration setters
   void set_refresh_rate(const std::string &rate) { refresh_rate_ = rate; }
@@ -66,6 +66,13 @@ class MLX90640Component : public thermal_camera_core::ThermalCameraBase {
   int setup_thermal_resolution_(int bits);
   int setup_thermal_pattern_(const std::string &pattern);
 
+  // Frame reading (rolling, non-blocking). poll_subpage_ reads one subpage into
+  // pixels_ only when the sensor already has fresh data ready, so the driver's
+  // internal busy-wait can never stall the loop. prime_frame_ blocks (setup
+  // only, where blocking is free) until both checkerboard halves are captured.
+  int poll_subpage_();
+  void prime_frame_();
+
   // Configuration
   std::string refresh_rate_{"16Hz"};
   std::string resolution_{"18-bit"};
@@ -81,6 +88,15 @@ class MLX90640Component : public thermal_camera_core::ThermalCameraBase {
   // Hardware state
   paramsMLX90640 mlx90640_params_;
   uint16_t mlx90640Frame_[834];  // MLX90640 frame buffer (class member to prevent stack overflow)
+
+  // Rolling-frame state (mirrors m5stack_thermal2): each cycle updates one
+  // checkerboard half; the frame is only reported ready once both halves hold
+  // real data, so half zero-init pixels never reach stats/alarm/JPEG.
+  bool frame_primed_{false};  // both subpages captured at least once
+  uint8_t subpages_seen_{0};  // bit0 = subpage 0, bit1 = subpage 1
+  // Neighbor geometry for MLX90640_BadPixelsCorrection: 1 = chess, 0 = interleaved.
+  // Set from the configured pattern in setup_thermal_pattern_().
+  int bad_pixel_mode_{1};
 
   // Auto-generated control entities (optional, device-specific)
   number::Number *emissivity_control_{nullptr};
