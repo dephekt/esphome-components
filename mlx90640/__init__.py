@@ -63,9 +63,10 @@ PATTERNS = ["chess", "interleaved"]
 # - "chess": Chess pattern readout (default) - vendor recommended, better for even temperature distribution
 # - "interleaved": Interleaved pattern readout - different readout pattern
 #
-# SINGLE FRAME:
-# - false (default): Read both subpages for better image quality
-# - true: Read only one frame to reduce motion artifacts (checkerboard pattern)
+# SINGLE FRAME (per update tick; both modes read non-blocking — only subpages
+# already waiting in the sensor are pulled, the loop never waits on a conversion):
+# - false (default): read both subpages when both are already available
+# - true: read at most one subpage per tick (less I2C load, slightly more motion smear)
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -88,9 +89,16 @@ CONFIG_SCHEMA = (
                 ThermalNumber
             ).extend(
                 {
-                    cv.Optional("min_value", default=0.1): cv.float_,
-                    cv.Optional("max_value", default=1.0): cv.float_,
-                    cv.Optional("step", default=0.01): cv.float_,
+                    # Keep the control's bounds inside (0, 1] like the static
+                    # `emissivity:` key: MLX90640_CalculateTo divides by
+                    # emissivity, so a min_value of 0 would allow a divide-by-zero.
+                    cv.Optional("min_value", default=0.1): cv.float_range(
+                        min=0.1, max=1.0
+                    ),
+                    cv.Optional("max_value", default=1.0): cv.float_range(
+                        min=0.1, max=1.0
+                    ),
+                    cv.Optional("step", default=0.01): cv.positive_float,
                 }
             ),
             cv.Optional(CONF_REFLECTED_TEMPERATURE_CONTROL): number.number_schema(
