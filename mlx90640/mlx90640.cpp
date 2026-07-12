@@ -57,80 +57,98 @@ bool MLX90640Component::init_device_() {
     ESP_LOGCONFIG(TAG, "MLX90640 pattern mode set to %s", pattern_.c_str());
   }
 
+  // Prime both checkerboard halves once, here in setup() where blocking is free,
+  // so the first frame the loop publishes is complete rather than half zero-init.
+  prime_frame_();
+
   initialized_ = true;
   ESP_LOGCONFIG(TAG, "MLX90640 thermal camera initialized successfully");
   return true;
 }
 
+// Reads one subpage into pixels_ IFF the sensor already has a fresh subpage
+// waiting. Returns 1 = a subpage was read and integrated, 0 = no fresh data yet
+// (the caller must not block), -1 = I2C/frame error. Polling the data-ready bit
+// up front means MLX90640_GetFrameData's internal `while (dataReady == 0)` spin
+// exits immediately, so this never blocks the loop waiting on a conversion.
+int MLX90640Component::poll_subpage_() {
+  uint16_t status = 0;
+  if (MLX90640_I2CRead(this->address_, MLX90640_STATUS_REG, 1, &status) != 0)
+    return -1;
+  if (!MLX90640_GET_DATA_READY(status))
+    return 0;  // no fresh subpage yet
+
+  int subpage = MLX90640_GetFrameData(this->address_, mlx90640Frame_);
+  if (subpage < 0) {
+    ESP_LOGD(TAG, "MLX90640 GetFrame error: %d", subpage);
+    return -1;
+  }
+
+  // Determine the reflected temperature for this frame.
+  float ta = MLX90640_GetTa(mlx90640Frame_, &mlx90640_params_);
+  float tr;
+  if (reflected_temperature_auto_ || std::isnan(reflected_temperature_)) {
+    tr = ta - ta_shift_;
+  } else {
+    tr = reflected_temperature_;
+  }
+
+  // CalculateTo writes only the current subpage's 384 pixels into pixels_; the
+  // opposite checkerboard half carries over from a previous cycle. Display
+  // interpolation happens lazily in generate_jpg_jpegenc_ (base).
+  MLX90640_CalculateTo(mlx90640Frame_, &mlx90640_params_, emissivity_, tr, pixels_);
+
+  // Fix bad pixels using neighboring-pixel interpolation (mode matches the
+  // configured readout pattern — see setup_thermal_pattern_).
+  MLX90640_BadPixelsCorrection(mlx90640_params_.brokenPixels, pixels_, bad_pixel_mode_, &mlx90640_params_);
+  MLX90640_BadPixelsCorrection(mlx90640_params_.outlierPixels, pixels_, bad_pixel_mode_, &mlx90640_params_);
+
+  subpages_seen_ |= (subpage == 0) ? 0x01 : 0x02;
+  return 1;
+}
+
+// Blocking read of both subpages, called once from init_device_() where blocking
+// is free. Guarantees the first frame the loop publishes is a complete 32x24
+// image instead of one half of real data and one half of zero-init 0°C pixels
+// (which would otherwise pass the validity filter and skew min/avg/median).
+void MLX90640Component::prime_frame_() {
+  uint32_t start = millis();
+  while (subpages_seen_ != 0x03 && (millis() - start < 1000)) {
+    if (poll_subpage_() == 0)
+      delay(2);  // no fresh subpage yet; yield briefly and retry
+  }
+  frame_primed_ = (subpages_seen_ == 0x03);
+  if (frame_primed_) {
+    ESP_LOGCONFIG(TAG, "MLX90640 primed both subpages");
+  } else {
+    ESP_LOGW(TAG, "MLX90640 frame priming incomplete (subpages=0x%02X)", subpages_seen_);
+  }
+}
+
 bool MLX90640Component::read_frame_() {
-  // Synchronize frame to ensure fresh data is available
-  int sync_status = MLX90640_SynchFrame(this->address_);
-  if (sync_status != 0) {
-    ESP_LOGW(TAG, "MLX90640 frame synchronization failed: %d", sync_status);
-    return false;
+  // Rolling, non-blocking frame read: pull however many subpages are already
+  // waiting (0, 1, or — when not single_frame — up to 2) without ever blocking
+  // on the next conversion. The opposite checkerboard half carries over from the
+  // previous cycle. single_frame caps this at one subpage per tick (less I2C bus
+  // load, slightly more motion smear); the default reads both when both are ready.
+  int max_reads = single_frame_ ? 1 : 2;
+  int reads = 0;
+  for (int i = 0; i < max_reads; i++) {
+    int r = poll_subpage_();
+    if (r <= 0)
+      break;  // error, or no fresh subpage ready right now — do not block
+    reads++;
   }
 
-  // Read frames based on configuration
-  bool frame_read = false;
-  int max_frames = single_frame_ ? 1 : 2;
-  int consecutive_failures = 0;
-  int subpages_collected = 0;
+  if (reads == 0)
+    return false;  // nothing new this cycle; keep last full frame, skip stats
 
-  for (uint8_t attempt = 0; attempt < max_frames; attempt++) {
-    uint32_t start_time = millis();
-    int status = MLX90640_GetFrameData(this->address_, mlx90640Frame_);
-    uint32_t read_time = millis() - start_time;
-
-    if (status < 0) {
-      ESP_LOGD(TAG, "MLX90640 GetFrame attempt %d error: %d (took %dms)", attempt, status, read_time);
-      consecutive_failures++;
-      if (consecutive_failures > 3) {
-        ESP_LOGW(TAG, "MLX90640 consecutive failures, skipping thermal update");
-        return false;
-      }
-      continue;
-    }
-
-    // Determine the reflected temperature for this frame
-    float ta = MLX90640_GetTa(mlx90640Frame_, &mlx90640_params_);
-    float tr;
-    if (reflected_temperature_auto_ || std::isnan(reflected_temperature_)) {
-      tr = ta - ta_shift_;
-    } else {
-      tr = reflected_temperature_;
-    }
-
-    // Calculate pixel temperatures directly into the base's pixel buffer.
-    // Display interpolation now happens lazily in generate_jpg_jpegenc_
-    // (base), not on every read cycle.
-    MLX90640_CalculateTo(mlx90640Frame_, &mlx90640_params_, emissivity_, tr, pixels_);
-
-    // Fix bad pixels using neighboring pixel interpolation
-    MLX90640_BadPixelsCorrection(mlx90640_params_.brokenPixels, pixels_, 1, &mlx90640_params_);
-    MLX90640_BadPixelsCorrection(mlx90640_params_.outlierPixels, pixels_, 1, &mlx90640_params_);
-
-    frame_read = true;
-    subpages_collected++;
-
-    // For single frame mode, we're done after one successful read
-    if (single_frame_) {
-      ESP_LOGD(TAG, "Single frame mode: collected 1 subpage");
-      break;
-    }
-
-    // For dual subpage mode, continue collecting until we have both or reach max attempts
-    if (subpages_collected >= 2) {
-      ESP_LOGD(TAG, "Dual subpage mode: collected %d subpages", subpages_collected);
-      break;
-    }
-  }
-
-  if (!frame_read) {
-    ESP_LOGD(TAG, "Failed to read any MLX90640 frames");
-    return false;
-  }
-
-  return true;
+  // Only report a frame ready once both halves hold real data. setup() primes
+  // this; finish it here if priming timed out, so stats/alarm/JPEG never see a
+  // half zero-init frame.
+  if (!frame_primed_)
+    frame_primed_ = (subpages_seen_ == 0x03);
+  return frame_primed_;
 }
 
 void MLX90640Component::dump_device_config_() {
@@ -198,12 +216,17 @@ int MLX90640Component::setup_thermal_resolution_(int bits) {
 }
 
 int MLX90640Component::setup_thermal_pattern_(const std::string &pattern) {
+  // bad_pixel_mode_ must match the readout pattern: MLX90640_BadPixelsCorrection
+  // interpolates from different neighbors in chess (1) vs interleaved (0) mode.
   if (pattern == "chess") {
+    bad_pixel_mode_ = 1;
     return MLX90640_SetChessMode(this->address_);
   } else if (pattern == "interleaved") {
+    bad_pixel_mode_ = 0;
     return MLX90640_SetInterleavedMode(this->address_);
   } else {
     ESP_LOGW(TAG, "Unknown pattern mode: %s, using chess", pattern.c_str());
+    bad_pixel_mode_ = 1;
     return MLX90640_SetChessMode(this->address_);
   }
 }
